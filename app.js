@@ -3966,16 +3966,7 @@ async function saveAllConfig() {
   updateConfigSaveStatus('Đang lưu...');
 
   try {
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'save_config',
-        month: month,
-        config: config
-      })
-    });
-    const json = await res.json();
+    const json = await apiPost('save_config', null, { month, config });
     if (json.success) {
       state.config.data = config;
       state.config.dirty = false;
