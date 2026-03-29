@@ -338,9 +338,20 @@ async function apiFetch(action, extraParams = {}) {
   const url = new URL(APPS_SCRIPT_URL);
   url.searchParams.set('action', action);
   Object.entries(extraParams).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+
+  // 60s timeout for large responses
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  try {
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch(e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') throw new Error('Timeout - thử lại sau');
+    throw e;
+  }
 }
 
 async function apiPost(action, tab, body) {
@@ -1463,24 +1474,24 @@ async function runAnalysis() {
 
   try {
     // Preload config for this month
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải cấu hình...';
     await preloadConfigForMonth(month);
 
     // AP được CM lưu theo period "tuần hiện tại" (= tuần tiếp theo của WR).
-    // Ví dụ: WR = 2026-02 W4 thì AP = 2026-03 W1.
-    // Cần fetch cả 2 period rồi merge: WR từ WR-period, AP từ AP-period.
     const apPeriod = getAPPeriodFromWR(month, week);
     const isSamePeriod = apPeriod.month === month && apPeriod.week === parseInt(week);
 
     let allData;
     if (isSamePeriod) {
-      // Hiếm khi xảy ra, nhưng không cần fetch 2 lần
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải dữ liệu...';
       allData = await apiFetch('all_data', { month, week });
     } else {
-      // Fetch song song: WR data + AP data
-      const [wrData, apData] = await Promise.all([
-        apiFetch('all_data', { month, week }),
-        apiFetch('all_data', { month: apPeriod.month, week: apPeriod.week })
-      ]);
+      // Fetch TUẦN TỰ (không song song) để giảm tải
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải WR data...';
+      const wrData = await apiFetch('all_data', { month, week });
+
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải AP data...';
+      const apData = await apiFetch('all_data', { month: apPeriod.month, week: apPeriod.week });
 
       // Merge: lấy WR từ wrData, lấy AP từ apData
       allData = {};
@@ -1489,8 +1500,8 @@ async function runAnalysis() {
         const wr = wrData[bu] || { AP: [], WR: [] };
         const ap = apData[bu] || { AP: [], WR: [] };
         allData[bu] = {
-          AP: ap.AP || [],    // AP từ AP-period
-          WR: wr.WR || []     // WR từ WR-period
+          AP: ap.AP || [],
+          WR: wr.WR || []
         };
       });
     }
@@ -1498,6 +1509,7 @@ async function runAnalysis() {
     state.dashboard.allData = allData;
 
     // Load Daily Report data cho tháng hiện tại
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải Daily...';
     try {
       const dailyResult = await apiFetch('getDailyAll', { month });
       state.dashboard._dailyData = dailyResult.data || [];
