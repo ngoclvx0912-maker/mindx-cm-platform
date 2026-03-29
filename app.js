@@ -38,15 +38,6 @@ const state = {
     sortDir: 'asc',
     funcFilter: 'ALL'
   },
-  training: {
-    month: '',
-    allData: null,
-    scores: [],
-    filteredScores: [],
-    selectedBU: null,
-    sortCol: 'total',
-    sortDir: 'desc'
-  },
   config: {
     month: '',
     data: {},        // config data for current month
@@ -360,7 +351,7 @@ function showSetupBanner() {
 }
 
 // ===================== ACCESS CONTROL =====================
-const ACCESS_PROTECTED_VIEWS = ['dashboard', 'training', 'config'];
+const ACCESS_PROTECTED_VIEWS = ['dashboard', 'config'];
 let accessGranted = false;
 
 // Mật khẩu được encode
@@ -403,7 +394,7 @@ function submitPassword() {
 
 // ===================== ROUTING =====================
 function navigate(view) {
-  // Kiểm tra mật khẩu cho dashboard và training
+  // Kiểm tra mật khẩu cho dashboard và config
   if (ACCESS_PROTECTED_VIEWS.includes(view) && !accessGranted) {
     showPasswordModal(view);
     return;
@@ -424,8 +415,6 @@ function navigate(view) {
   // Đóng tất cả detail panel khi chuyển view
   const dashPanel = document.getElementById('detail-panel');
   if (dashPanel) dashPanel.classList.remove('open');
-  const trainingPanel = document.getElementById('training-detail-panel');
-  if (trainingPanel) trainingPanel.classList.remove('open');
   const overlay = document.getElementById('panel-overlay');
   if (overlay) overlay.classList.remove('active');
 
@@ -437,11 +426,6 @@ function navigate(view) {
   // Auto-load dashboard khi navigate đến (nếu chưa có data hoặc lần đầu)
   if (view === 'dashboard' && !state.dashboard.allData) {
     runAnalysis();
-  }
-
-  // Auto-load training khi navigate đến (nếu chưa có data)
-  if (view === 'training' && !state.training.allData) {
-    runTrainingAnalysis();
   }
 
   // Init config view
@@ -464,7 +448,6 @@ function initRouting() {
   const hash = window.location.hash.replace('#', '');
   if (hash === 'cm') navigate('cm');
   else if (hash === 'dashboard') navigate('dashboard');
-  else if (hash === 'training') navigate('training');
   else if (hash === 'config') navigate('config');
   else if (hash === 'discussion') navigate('discussion');
   else if (hash === 'daily') navigate('daily');
@@ -474,7 +457,6 @@ function initRouting() {
     const h = window.location.hash.replace('#', '');
     if (h === 'cm') navigate('cm');
     else if (h === 'dashboard') navigate('dashboard');
-    else if (h === 'training') navigate('training');
     else if (h === 'config') navigate('config');
     else if (h === 'discussion') navigate('discussion');
     else if (h === 'daily') navigate('daily');
@@ -566,28 +548,6 @@ function populateSelects() {
   // Update dashboard period display
   updateDashPeriodDisplay();
 
-  // Training: chỉ dùng tháng (không theo tuần)
-  state.training.month = period.ap.month;
-
-  // Populate training month dropdown
-  const trainingHistSel = document.getElementById('training-period-history');
-  if (trainingHistSel) {
-    const currentTrainingMonth = period.ap.month;
-    MONTHS.forEach(m => {
-      const o = document.createElement('option');
-      o.value = m;
-      const [y, mo] = m.split('-');
-      o.textContent = `Th\u00E1ng ${parseInt(mo)}/${y}`;
-      if (m === currentTrainingMonth) {
-        o.textContent += ' (hi\u1EC7n t\u1EA1i)';
-        o.selected = true;
-      }
-      trainingHistSel.appendChild(o);
-    });
-  }
-
-  // Update training period display
-  updateTrainingPeriodDisplay();
 }
 
 /** Cập nhật label kỳ báo cáo trên Dashboard */
@@ -598,17 +558,6 @@ function updateDashPeriodDisplay() {
   const [y, mo] = month.split('-');
   el.textContent = `Tháng ${parseInt(mo)}/${y} — Tuần ${week}`;
 }
-
-/** Cập nhật label kỳ báo cáo trên Training (chỉ tháng) */
-function updateTrainingPeriodDisplay() {
-  const el = document.getElementById('training-current-period');
-  if (!el) return;
-  const { month } = state.training;
-  const [y, mo] = month.split('-');
-  el.textContent = `Tháng ${parseInt(mo)}/${y}`;
-}
-
-/** Hàm getAPPeriodFromWR đã loại bỏ — không còn dùng WR logic */
 
 function onDashPeriodChange() {
   const histSel = document.getElementById('dash-period-history');
@@ -623,15 +572,6 @@ function onDashPeriodChange() {
 
   // Auto-load dữ liệu cho kỳ đã chọn
   runAnalysis();
-}
-
-/** Khi chọn tháng khác cho Training */
-function onTrainingPeriodChange() {
-  const histSel = document.getElementById('training-period-history');
-  state.training.month = histSel.value;
-  updateTrainingPeriodDisplay();
-
-  runTrainingAnalysis();
 }
 
 function updateCMPeriodDisplay() {
@@ -2504,7 +2444,6 @@ function init() {
   // Panel overlay click — closes whichever panel is open
   document.getElementById('panel-overlay').addEventListener('click', () => {
     closeDetailPanel();
-    closeTrainingDetail();
   });
 
   // Daily Report events
@@ -3741,688 +3680,6 @@ function renderFuncKPICards(func, allData, week) {
   }).join('');
 }
 
-// ===================== FEATURE 3: CM TRAINING DASHBOARD =====================
-// 4 tiêu chí: 3 kỹ năng chính (30% mỗi tiêu chí) + 1 kỷ luật phụ (10%)
-
-/**
- * Tính 4 tiêu chí Training cho 1 BU
- * @param {Array} apRows - AP rows for this BU (merged 4 weeks)
- * @param {Array} wrRows - WR rows for this BU (merged 4 weeks)
- * @param {number} weeksWithAP - Số tuần có nộp AP (0-4)
- * @param {number} weeksWithWR - Số tuần có nộp WR (0-4)
- * @returns {{ dataAnalysis, solutionDesign, execution, discipline, total }}
- */
-function computeTrainingScoresForBU(apRows, wrRows, weeksWithAP, weeksWithWR) {
-  // ═══════ 1. PHÂN TÍCH DỮ LIỆU (30%) ═══════
-  // Gộp: Data Literacy (điền Target+Actual) + Root Cause quality
-  // Sub-score A: % WR rows có cả Target + Actual → 50 điểm
-  let subDataLiteracy = 0;
-  if (wrRows && wrRows.length > 0) {
-    let filled = 0;
-    wrRows.forEach(row => {
-      const hasTarget = row.target !== undefined && row.target !== '' && row.target !== null;
-      const hasActual = row.actual !== undefined && row.actual !== '' && row.actual !== null;
-      if (hasTarget && hasActual) filled++;
-    });
-    subDataLiteracy = Math.round((filled / wrRows.length) * 50);
-  }
-  // Sub-score B: % AP rows có root_cause > 20 ký tự → 50 điểm
-  let subRootCause = 0;
-  if (apRows && apRows.length > 0) {
-    let rcGood = 0;
-    apRows.forEach(row => {
-      if (row.root_cause && String(row.root_cause).trim().length > 20) rcGood++;
-    });
-    subRootCause = Math.round((rcGood / apRows.length) * 50);
-  }
-  const dataAnalysis = Math.min(100, subDataLiteracy + subRootCause);
-
-  // ═══════ 2. THIẾT KẾ GIẢI PHÁP (30%) ═══════
-  // Gộp: Function coverage + SMART (target đo lường + deadline + owner)
-  let solutionDesign = 0;
-  if (apRows && apRows.length > 0) {
-    const n = apRows.length;
-    // Function coverage: 3 funcs = 40pts, 2 = 25pts, 1 = 10pts
-    const funcs = new Set(apRows.map(r => r.func).filter(Boolean));
-    let funcScore = 0;
-    if (funcs.size >= 3) funcScore = 40;
-    else if (funcs.size === 2) funcScore = 25;
-    else if (funcs.size === 1) funcScore = 10;
-
-    // SMART: target_do_luong + deadline + owner đầy đủ → 60pts
-    let smartCount = 0;
-    apRows.forEach(row => {
-      const hasTarget = row.target_do_luong && String(row.target_do_luong).trim() !== '';
-      const hasDeadline = row.deadline && String(row.deadline).trim() !== '';
-      const hasOwner = row.owner && String(row.owner).trim() !== '';
-      if (hasTarget && hasDeadline && hasOwner) smartCount++;
-    });
-    const smartScore = Math.round((smartCount / n) * 60);
-
-    solutionDesign = Math.min(100, funcScore + smartScore);
-  }
-
-  // ═══════ 3. THỰC THI (30%) ═══════
-  // % Action Plan có status "Hoàn thành"
-  let execution = 0;
-  if (apRows && apRows.length > 0) {
-    const done = apRows.filter(r => r.status === 'Hoàn thành').length;
-    execution = Math.round((done / apRows.length) * 100);
-  }
-
-  // ═══════ 4. KỶ LUẬT BÁO CÁO (10%) ═══════
-  // Gộp Reporting Quality (60%) + Timeliness (40%)
-  const apResult = scoreAP(apRows || []);
-  const wrResult = scoreWR(wrRows || []);
-  const reportingQuality = apResult.score + wrResult.score; // 0-100
-
-  const wAP = weeksWithAP || 0;
-  const wWR = weeksWithWR || 0;
-  const timeliness = Math.round(((wAP + wWR) / 8) * 100); // 0-100
-
-  const discipline = Math.round(reportingQuality * 0.6 + timeliness * 0.4);
-
-  const hasAP = apRows && apRows.length > 0;
-  const hasWR = wrRows && wrRows.length > 0;
-
-  // Trọng số: đọc từ config hoặc dùng default (30/30/30/10)
-  const month = state.training.month;
-  const cfgData = getActiveConfig(month);
-  const weights = getTrainingWeights(cfgData);
-
-  const total = Math.round(
-    dataAnalysis * weights.dataAnalysis +
-    solutionDesign * weights.solutionDesign +
-    execution * weights.execution +
-    discipline * weights.discipline
-  );
-
-  return {
-    dataAnalysis,
-    solutionDesign,
-    execution,
-    discipline,
-    total,
-    hasAP,
-    hasWR,
-    weeksWithAP: wAP,
-    weeksWithWR: wWR
-  };
-}
-
-/**
- * Tính toàn bộ scores cho tất cả 46 BU từ allData
- */
-function computeTrainingScores(allData) {
-  const month = state.training.month;
-  const cfgData = getActiveConfig(month);
-
-  return BU_LIST.map(buName => {
-    const buData = allData[buName] || { AP: [], WR: [], weeksWithAP: 0, weeksWithWR: 0 };
-    const apRows = buData.AP || [];
-    const wrRows = buData.WR || [];
-    const weeksWithAP = buData.weeksWithAP || 0;
-    const weeksWithWR = buData.weeksWithWR || 0;
-
-    const scores = computeTrainingScoresForBU(apRows, wrRows, weeksWithAP, weeksWithWR);
-    const region = getRegion(buName);
-
-    // Đánh giá (dùng config thresholds)
-    const evalResult = getTrainingEvalFromConfig(scores.total, cfgData);
-
-    return {
-      bu: buName,
-      region,
-      ...scores,
-      evalLabel: evalResult.label,
-      evalCls: evalResult.cls,
-      evalColor: evalResult.color
-    };
-  });
-}
-
-/** Xếp loại training */
-function getTrainingEval(total) {
-  if (total >= 80) return { label: 'Xuất sắc', cls: 'xuat-sac', color: '#1a7a3a' };
-  if (total >= 60) return { label: 'Khá', cls: 'kha', color: '#1a5276' };
-  if (total >= 40) return { label: 'Trung bình', cls: 'trung-binh', color: '#c07000' };
-  return { label: 'Cần phát triển', cls: 'can-phat-trien', color: '#cc0000' };
-}
-
-/** Màu sắc dựa trên điểm (0-100) */
-function getScoreColor(score) {
-  if (score >= 80) return '#1a7a3a';
-  if (score >= 60) return '#1a5276';
-  if (score >= 40) return '#c07000';
-  return '#cc0000';
-}
-
-/**
- * Chạy phân tích Training Dashboard — gộp dữ liệu cả 4 tuần trong tháng
- */
-async function runTrainingAnalysis() {
-  const month = state.training.month;
-
-  const btn = document.getElementById('btn-training-analyze');
-  const btnOrigHTML = btn.innerHTML;
-  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Đang cập nhật...';
-  btn.disabled = true;
-
-  if (!isConfigured()) {
-    showToast('Chưa cấu hình Google Apps Script URL. Xem SETUP.md để biết cách thiết lập.', 'error');
-    btn.innerHTML = btnOrigHTML;
-    btn.disabled = false;
-    return;
-  }
-
-  try {
-    // Preload config for this month
-    await preloadConfigForMonth(month);
-
-    // AP được lưu trực tiếp theo month/week tương ứng.
-    // Fetch 4 tuần AP trong tháng.
-    const [y, mo] = month.split('-');
-
-    const [w1, w2, w3, w4] = await Promise.all([
-      apiFetch('all_data', { month, week: 1 }),
-      apiFetch('all_data', { month, week: 2 }),
-      apiFetch('all_data', { month, week: 3 }),
-      apiFetch('all_data', { month, week: 4 })
-    ]);
-
-    const weekDataList = [w1, w2, w3, w4];
-
-    // Gộp dữ liệu 4 tuần: merge AP rows và đếm tuần submitted
-    const mergedData = {};
-    BU_LIST.forEach(bu => {
-      mergedData[bu] = { AP: [], WR: [], weeksWithAP: 0, weeksWithWR: 0 };
-    });
-
-    weekDataList.forEach(weekData => {
-      BU_LIST.forEach(bu => {
-        const buData = weekData[bu] || { AP: [], WR: [] };
-
-        if (buData.AP && buData.AP.length > 0) {
-          mergedData[bu].AP = mergedData[bu].AP.concat(buData.AP);
-          mergedData[bu].weeksWithAP++;
-        }
-      });
-    });
-
-    state.training.allData = mergedData;
-    state.training.scores = computeTrainingScores(mergedData);
-    state.training.filteredScores = [...state.training.scores];
-
-    renderTrainingDashboard();
-    showToast(`CM Training — Đã cập nhật Tháng ${parseInt(mo)}/${y}`);
-  } catch(e) {
-    showToast('Lỗi tải dữ liệu training: ' + e.message, 'error');
-  } finally {
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Cập nhật';
-    btn.disabled = false;
-  }
-}
-
-/**
- * Render toàn bộ Training Dashboard (summary cards + table)
- */
-function renderTrainingDashboard() {
-  renderTrainingSummaryCards(state.training.scores);
-  applyTrainingFilters();
-}
-
-/**
- * Render 4 summary cards hiển thị trung bình hệ thống (3 kỹ năng chính + 1 kỷ luật)
- */
-function renderTrainingSummaryCards(scores) {
-  const container = document.getElementById('training-summary-cards');
-  if (!container) return;
-
-  if (!scores || scores.length === 0) {
-    container.innerHTML = '<div class="training-summary-placeholder"><div style="text-align:center;padding:32px;color:#aaa">Chưa có dữ liệu</div></div>';
-    return;
-  }
-
-  const n = scores.length;
-
-  const criteria = [
-    {
-      key: 'dataAnalysis',
-      label: 'Phân tích dữ liệu',
-      sublabel: 'Đọc số · Phát hiện vấn đề · Root cause',
-      icon: '🔍',
-      weight: '30%',
-      avg: Math.round(scores.reduce((s, x) => s + x.dataAnalysis, 0) / n)
-    },
-    {
-      key: 'solutionDesign',
-      label: 'Thiết kế giải pháp',
-      sublabel: 'Phủ Function · Key Action SMART',
-      icon: '💡',
-      weight: '30%',
-      avg: Math.round(scores.reduce((s, x) => s + x.solutionDesign, 0) / n)
-    },
-    {
-      key: 'execution',
-      label: 'Thực thi',
-      sublabel: 'Hoàn thành Action đã cam kết',
-      icon: '⚡',
-      weight: '30%',
-      avg: Math.round(scores.reduce((s, x) => s + x.execution, 0) / n)
-    },
-    {
-      key: 'discipline',
-      label: 'Kỷ luật báo cáo',
-      sublabel: 'Chất lượng + đúng hạn',
-      icon: '📋',
-      weight: '10%',
-      avg: Math.round(scores.reduce((s, x) => s + x.discipline, 0) / n)
-    }
-  ];
-
-  container.innerHTML = criteria.map(c => {
-    const color = getScoreColor(c.avg);
-    const statusLabel = c.avg >= 80 ? 'Tốt' : c.avg >= 60 ? 'Khá' : 'Cần cải thiện';
-    const statusCls = c.avg >= 80 ? 'training-card-good' : c.avg >= 60 ? 'training-card-ok' : 'training-card-poor';
-
-    // Circular progress ring
-    const radius = 28;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (c.avg / 100) * circumference;
-
-    return `
-      <div class="training-summary-card ${statusCls}">
-        <div class="training-summary-icon">${c.icon}</div>
-        <div class="training-summary-name">${c.label}</div>
-        <div class="training-summary-sublabel">${c.sublabel}</div>
-        <div class="training-summary-weight">Trọng số: ${c.weight}</div>
-        <div class="training-summary-ring-wrap">
-          <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle cx="36" cy="36" r="${radius}" fill="none" stroke="#e8eaf0" stroke-width="6"/>
-            <circle cx="36" cy="36" r="${radius}" fill="none" stroke="${color}" stroke-width="6"
-              stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
-              stroke-linecap="round" transform="rotate(-90 36 36)"/>
-          </svg>
-          <div class="training-summary-pct" style="color:${color}">${c.avg}</div>
-        </div>
-        <div class="training-summary-status" style="color:${color}">${statusLabel}</div>
-      </div>
-    `;
-  }).join('');
-}
-
-/**
- * Áp dụng bộ lọc và render bảng Training
- */
-function applyTrainingFilters() {
-  const searchVal = (document.getElementById('training-filter-search')?.value || '').toLowerCase();
-  const regionVal = document.getElementById('training-filter-region')?.value || '';
-  const evalVal = document.getElementById('training-filter-eval')?.value || '';
-
-  state.training.filteredScores = (state.training.scores || []).filter(s => {
-    if (searchVal && !s.bu.toLowerCase().includes(searchVal)) return false;
-    if (regionVal && s.region !== regionVal) return false;
-    if (evalVal && s.evalCls !== evalVal) return false;
-    return true;
-  });
-
-  const countEl = document.getElementById('training-filter-count');
-  if (countEl) countEl.textContent = `${state.training.filteredScores.length} BU`;
-
-  renderTrainingTable(state.training.filteredScores);
-}
-
-/**
- * Render bảng Training chính
- */
-function renderTrainingTable(scores) {
-  const tbody = document.getElementById('training-tbody');
-  if (!tbody) return;
-
-  if (!scores || scores.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:#888">Không có dữ liệu</td></tr>`;
-    return;
-  }
-
-  const { sortCol, sortDir } = state.training;
-
-  const sorted = [...scores].sort((a, b) => {
-    let va = a[sortCol], vb = b[sortCol];
-    if (typeof va === 'string') va = va.toLowerCase();
-    if (typeof vb === 'string') vb = vb.toLowerCase();
-    if (va < vb) return sortDir === 'asc' ? -1 : 1;
-    if (va > vb) return sortDir === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  // Tính rank
-  const sortedByTotal = [...(state.training.scores || [])].sort((a, b) => b.total - a.total);
-
-  tbody.innerHTML = sorted.map((s, idx) => {
-    const rank = sortedByTotal.findIndex(x => x.bu === s.bu) + 1;
-    const evalColor = s.evalColor || '#888';
-
-    function scoreCell(val) {
-      const color = getScoreColor(val);
-      return `<td class="score-cell" style="color:${color};font-weight:700">${val}</td>`;
-    }
-
-    return `
-    <tr data-bu="${escHtml(s.bu)}" onclick="openTrainingDetail('${escHtml(s.bu)}')"
-        class="${state.training.selectedBU === s.bu ? 'selected' : ''}">
-      <td style="color:#888;font-size:11px">#${rank}</td>
-      <td><strong>${escHtml(s.bu)}</strong></td>
-      <td><span class="region-badge">${escHtml(s.region)}</span></td>
-      ${scoreCell(s.dataAnalysis)}
-      ${scoreCell(s.solutionDesign)}
-      ${scoreCell(s.execution)}
-      ${scoreCell(s.discipline)}
-      <td class="score-cell" style="font-size:15px;font-weight:800;color:${getScoreColor(s.total)}">${s.total}</td>
-      <td><span class="training-eval-badge" style="background:${evalColor}20;color:${evalColor};border-color:${evalColor}40">${escHtml(s.evalLabel)}</span></td>
-      <td style="color:#aaa;font-size:11px;text-align:center">›</td>
-    </tr>
-    `;
-  }).join('');
-}
-
-/**
- * Sắp xếp bảng Training
- */
-function sortTrainingTable(col) {
-  if (state.training.sortCol === col) {
-    state.training.sortDir = state.training.sortDir === 'asc' ? 'desc' : 'asc';
-  } else {
-    state.training.sortCol = col;
-    state.training.sortDir = 'desc';
-  }
-  document.querySelectorAll('.training-table th').forEach(th => {
-    th.classList.remove('sorted-asc', 'sorted-desc');
-    if (th.dataset.sort === col) {
-      th.classList.add(state.training.sortDir === 'asc' ? 'sorted-asc' : 'sorted-desc');
-    }
-  });
-  renderTrainingTable(state.training.filteredScores);
-}
-
-/**
- * Mở detail panel cho một BU trong Training dashboard
- */
-function openTrainingDetail(bu) {
-  const s = (state.training.scores || []).find(x => x.bu === bu);
-  if (!s) return;
-
-  state.training.selectedBU = bu;
-
-  // Highlight row
-  document.querySelectorAll('#training-tbody tr').forEach(tr => {
-    tr.classList.toggle('selected', tr.dataset.bu === bu);
-  });
-
-  // Set header
-  document.getElementById('training-detail-bu-name').textContent = s.bu;
-  document.getElementById('training-detail-meta').textContent =
-    `Vùng: ${s.region} · Tháng ${state.training.month}`;
-
-  // Score breakdown
-  const breakdownEl = document.getElementById('training-detail-breakdown');
-  if (breakdownEl) {
-    const criteria = [
-      { label: 'Phân tích dữ liệu', desc: 'Đọc số · Phát hiện vấn đề · Root cause', val: s.dataAnalysis, icon: '🔍', weight: '30%' },
-      { label: 'Thiết kế giải pháp', desc: 'Phủ Function · Key Action SMART', val: s.solutionDesign, icon: '💡', weight: '30%' },
-      { label: 'Thực thi', desc: 'Hoàn thành Action đã cam kết', val: s.execution, icon: '⚡', weight: '30%' },
-      { label: 'Kỷ luật báo cáo', desc: 'Chất lượng + đúng hạn', val: s.discipline, icon: '📋', weight: '10%' }
-    ];
-    breakdownEl.innerHTML = `
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:6px 8px;background:#f0f4f8;color:#1a5276;font-size:10px;text-transform:uppercase;letter-spacing:0.4px">Tiêu chí</th>
-            <th style="text-align:center;padding:6px 8px;background:#f0f4f8;color:#1a5276;font-size:10px;text-transform:uppercase;letter-spacing:0.4px">Trọng số</th>
-            <th style="text-align:right;padding:6px 8px;background:#f0f4f8;color:#1a5276;font-size:10px;text-transform:uppercase;letter-spacing:0.4px">Điểm</th>
-            <th style="text-align:right;padding:6px 8px;background:#f0f4f8;color:#1a5276;font-size:10px;text-transform:uppercase;letter-spacing:0.4px">Mức</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${criteria.map(c => {
-            const color = getScoreColor(c.val);
-            const level = c.val >= 80 ? 'Tốt' : c.val >= 60 ? 'Khá' : c.val >= 40 ? 'TB' : 'Yếu';
-            return `
-              <tr style="border-bottom:1px solid #f0f0f0">
-                <td style="padding:8px;color:#333">
-                  <div>${c.icon} <strong>${escHtml(c.label)}</strong></div>
-                  <div style="font-size:10px;color:#888;margin-top:2px">${escHtml(c.desc)}</div>
-                </td>
-                <td style="text-align:center;padding:8px;font-size:11px;color:#1a5276;font-weight:600">${c.weight}</td>
-                <td style="text-align:right;padding:8px;font-weight:800;color:${color};font-size:16px">${c.val}</td>
-                <td style="text-align:right;padding:8px">
-                  <span style="background:${color}20;color:${color};border:1px solid ${color}40;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700">${level}</span>
-                </td>
-              </tr>
-            `;
-          }).join('')}
-          <tr style="background:#f0f4f8">
-            <td style="padding:8px;font-weight:700;color:#1a5276">Tổng điểm (có trọng số)</td>
-            <td style="text-align:center;padding:8px;font-size:11px;color:#888">100%</td>
-            <td style="text-align:right;padding:8px;font-weight:800;font-size:20px;color:${getScoreColor(s.total)}">${s.total}</td>
-            <td style="text-align:right;padding:8px">
-              <span class="training-eval-badge" style="background:${s.evalColor}20;color:${s.evalColor};border-color:${s.evalColor}40">${escHtml(s.evalLabel)}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    `;
-  }
-
-  // Coaching suggestion
-  const coachingEl = document.getElementById('training-coaching-content');
-  if (coachingEl) {
-    coachingEl.innerHTML = getCoachingSuggestion(s);
-  }
-
-  // Draw spider chart
-  setTimeout(() => {
-    drawTrainingSpiderChart('training-spider-canvas', s);
-  }, 50);
-
-  // Open panel
-  document.getElementById('training-detail-panel').classList.add('open');
-  document.getElementById('panel-overlay').classList.add('show');
-}
-
-/**
- * Đóng Training detail panel
- */
-function closeTrainingDetail() {
-  const panel = document.getElementById('training-detail-panel');
-  if (panel) panel.classList.remove('open');
-  document.getElementById('panel-overlay').classList.remove('show');
-  state.training.selectedBU = null;
-  document.querySelectorAll('#training-tbody tr').forEach(tr => tr.classList.remove('selected'));
-}
-
-/**
- * Vẽ Spider Chart 4 trục cho Training (3 kỹ năng chính + 1 kỷ luật)
- */
-function drawTrainingSpiderChart(canvasId, scores) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  const cx = W / 2, cy = H / 2;
-  const R = Math.min(W, H) / 2 - 48;
-
-  ctx.clearRect(0, 0, W, H);
-
-  const axes = [
-    { label: 'Phân tích\ndữ liệu', value: scores.dataAnalysis, weight: '30%' },
-    { label: 'Thiết kế\ngiải pháp', value: scores.solutionDesign, weight: '30%' },
-    { label: 'Thực thi', value: scores.execution, weight: '30%' },
-    { label: 'Kỷ luật\nbáo cáo', value: scores.discipline, weight: '10%' }
-  ];
-
-  const n = axes.length;
-  const angleStep = (2 * Math.PI) / n;
-  const startAngle = -Math.PI / 2;
-
-  function getPoint(axisIdx, dist) {
-    const angle = startAngle + axisIdx * angleStep;
-    return {
-      x: cx + dist * Math.cos(angle),
-      y: cy + dist * Math.sin(angle)
-    };
-  }
-
-  // Vẽ grid levels (25, 50, 75, 100)
-  const levels = [0.25, 0.5, 0.75, 1.0];
-  levels.forEach(lvl => {
-    ctx.beginPath();
-    const pts = axes.map((_, i) => getPoint(i, R * lvl));
-    ctx.moveTo(pts[0].x, pts[0].y);
-    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.closePath();
-    ctx.strokeStyle = lvl === 1.0 ? '#c8d8e8' : '#e8eef8';
-    ctx.lineWidth = lvl === 1.0 ? 1.5 : 1;
-    ctx.stroke();
-
-    // Level label
-    if (lvl < 1.0) {
-      ctx.fillStyle = '#aaa';
-      ctx.font = '9px Exo, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(Math.round(lvl * 100), cx - 4, cy - R * lvl + 4);
-    }
-  });
-
-  // Vẽ đường axis
-  axes.forEach((_, i) => {
-    const p = getPoint(i, R);
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(p.x, p.y);
-    ctx.strokeStyle = '#c8d8e8';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  });
-
-  // Vẽ data polygon
-  const dataPoints = axes.map((ax, i) => {
-    const val = Math.min(ax.value, 100);
-    return getPoint(i, R * (val / 100));
-  });
-
-  ctx.beginPath();
-  ctx.moveTo(dataPoints[0].x, dataPoints[0].y);
-  dataPoints.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(26,82,118,0.18)';
-  ctx.fill();
-  ctx.strokeStyle = '#1a5276';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Vẽ điểm dữ liệu
-  dataPoints.forEach((p, i) => {
-    const color = getScoreColor(axes[i].value);
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  });
-
-  // Nhãn axis
-  axes.forEach((ax, i) => {
-    const labelP = getPoint(i, R + 32);
-    ctx.fillStyle = '#1a1a1a';
-    ctx.font = 'bold 10px Exo, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    const lines = ax.label.split('\n');
-    const lineH = 13;
-    lines.forEach((line, li) => {
-      ctx.fillText(line, labelP.x, labelP.y + (li - (lines.length - 1) / 2) * lineH);
-    });
-
-    // Giá trị + weight
-    ctx.fillStyle = getScoreColor(ax.value);
-    ctx.font = 'bold 11px Exo, sans-serif';
-    ctx.fillText(String(ax.value), labelP.x, labelP.y + (lines.length) * lineH);
-    ctx.fillStyle = '#888';
-    ctx.font = '9px Exo, sans-serif';
-    ctx.fillText(ax.weight, labelP.x, labelP.y + (lines.length) * lineH + 13);
-  });
-}
-
-/**
- * Sinh gợi ý coaching dựa trên 2 điểm yếu nhất trong 4 tiêu chí
- */
-function getCoachingSuggestion(scores) {
-  const criteria = [
-    {
-      key: 'dataAnalysis',
-      label: 'Phân tích dữ liệu',
-      val: scores.dataAnalysis,
-      weight: '30%',
-      suggestion: 'CM cần cải thiện khả năng đọc và phân tích dữ liệu. Cụ thể: (1) Điền đầy đủ Target và Actual cho tất cả 17 KPI trong Weekly Report, kể cả chỉ số chưa đạt; (2) Viết Root Cause chi tiết, đi sâu vào nguyên nhân gốc rễ (tối thiểu 20 ký tự), không dừng lại ở mô tả hiện tượng. FM có thể huấn luyện CM dùng phương pháp "5 Why" để đào sâu vấn đề.'
-    },
-    {
-      key: 'solutionDesign',
-      label: 'Thiết kế giải pháp',
-      val: scores.solutionDesign,
-      weight: '30%',
-      suggestion: 'CM cần cải thiện chất lượng thiết kế giải pháp. Cụ thể: (1) Phủ đủ 3 Function (GROWTH, OPTIMIZE, OPS) trong Action Plan để đảm bảo giải quyết toàn diện; (2) Mỗi Key Action phải SMART: có Target đo lường cụ thể, Deadline rõ ràng, và Owner chịu trách nhiệm. FM nên review AP cùng CM trước khi submit.'
-    },
-    {
-      key: 'execution',
-      label: 'Thực thi',
-      val: scores.execution,
-      weight: '30%',
-      suggestion: 'Tỷ lệ hoàn thành Action Plan thấp. CM cần: (1) Cập nhật trạng thái các action thường xuyên và đánh dấu "Hoàn thành" khi đã thực hiện xong; (2) Nếu không thể hoàn thành, ghi rõ lý do và điều chỉnh. FM nên check-in giữa tuần để đốc thúc tiến độ và gỡ chướng ngại cho CM.'
-    },
-    {
-      key: 'discipline',
-      label: 'Kỷ luật báo cáo',
-      val: scores.discipline,
-      weight: '10%',
-      suggestion: `CM cần cải thiện kỷ luật báo cáo. Trong tháng này: ${scores.weeksWithAP || 0}/4 tuần có AP, ${scores.weeksWithWR || 0}/4 tuần có WR. Nhắc nhở CM nộp cả AP và WR đầy đủ mỗi tuần trước Thứ 4. Nếu cần, FM có thể gửi reminder vào Chủ nhật hoặc Thứ 2.`
-    }
-  ];
-
-  // Sort by score ascending to find weakest 2
-  const sorted = [...criteria].sort((a, b) => a.val - b.val);
-  const weakest = sorted.slice(0, 2);
-
-  if (weakest[0].val >= 80 && weakest[1].val >= 80) {
-    return `
-      <div class="coaching-good">
-        <div class="coaching-good-icon">🏆</div>
-        <div>
-          <div class="coaching-good-title">CM này đang thực hiện tốt trên tất cả tiêu chí!</div>
-          <div class="coaching-good-desc">Tiếp tục duy trì và có thể chia sẻ best-practice với các BU khác.</div>
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="coaching-items">
-      ${weakest.map((c, i) => `
-        <div class="coaching-item">
-          <div class="coaching-item-header">
-            <span class="coaching-item-num">${i + 1}</span>
-            <span class="coaching-item-criterion">${escHtml(c.label)}</span>
-            <span class="coaching-item-score" style="color:${getScoreColor(c.val)}">${c.val} điểm</span>
-          </div>
-          <div class="coaching-item-text">${escHtml(c.suggestion)}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
 // ===================== CONFIG MANAGEMENT =====================
 
 // Defaults — used when no config exists in sheet
@@ -4446,17 +3703,6 @@ const CONFIG_DEFAULTS = {
     tot: 80,
     daydu: 60,
     hoihot: 40
-  },
-  training_weights: {
-    data_analysis: 30,
-    solution_design: 30,
-    execution: 30,
-    discipline: 10
-  },
-  training_thresholds: {
-    xuatsac: 80,
-    kha: 60,
-    tb: 40
   },
   bu_list: {
     list: [...BU_LIST]
@@ -4491,12 +3737,6 @@ function initConfigView() {
 
   // Show role badge
   showConfigRoleBadge();
-
-  // Live-check training weights total
-  ['cfg-tw-data', 'cfg-tw-solution', 'cfg-tw-exec', 'cfg-tw-discipline'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', checkTrainingWeightsTotal);
-  });
 
   // Live BU count
   const buTA = document.getElementById('cfg-bu-list');
@@ -4650,18 +3890,6 @@ function populateConfigUI() {
   setVal('cfg-rating-daydu', getNestedVal(d, 'rating_thresholds', 'daydu', CONFIG_DEFAULTS.rating_thresholds.daydu));
   setVal('cfg-rating-hoihot', getNestedVal(d, 'rating_thresholds', 'hoihot', CONFIG_DEFAULTS.rating_thresholds.hoihot));
 
-  // Training weights
-  setVal('cfg-tw-data', getNestedVal(d, 'training_weights', 'data_analysis', CONFIG_DEFAULTS.training_weights.data_analysis));
-  setVal('cfg-tw-solution', getNestedVal(d, 'training_weights', 'solution_design', CONFIG_DEFAULTS.training_weights.solution_design));
-  setVal('cfg-tw-exec', getNestedVal(d, 'training_weights', 'execution', CONFIG_DEFAULTS.training_weights.execution));
-  setVal('cfg-tw-discipline', getNestedVal(d, 'training_weights', 'discipline', CONFIG_DEFAULTS.training_weights.discipline));
-  checkTrainingWeightsTotal();
-
-  // Training thresholds
-  setVal('cfg-te-xuatsac', getNestedVal(d, 'training_thresholds', 'xuatsac', CONFIG_DEFAULTS.training_thresholds.xuatsac));
-  setVal('cfg-te-kha', getNestedVal(d, 'training_thresholds', 'kha', CONFIG_DEFAULTS.training_thresholds.kha));
-  setVal('cfg-te-tb', getNestedVal(d, 'training_thresholds', 'tb', CONFIG_DEFAULTS.training_thresholds.tb));
-
   // BU list
   const buTA = document.getElementById('cfg-bu-list');
   if (buTA) {
@@ -4726,21 +3954,6 @@ function readConfigFromUI() {
     hoihot: parseInt(document.getElementById('cfg-rating-hoihot')?.value) || 40
   };
 
-  // Training weights
-  config.training_weights = {
-    data_analysis: parseInt(document.getElementById('cfg-tw-data')?.value) || 30,
-    solution_design: parseInt(document.getElementById('cfg-tw-solution')?.value) || 30,
-    execution: parseInt(document.getElementById('cfg-tw-exec')?.value) || 30,
-    discipline: parseInt(document.getElementById('cfg-tw-discipline')?.value) || 10
-  };
-
-  // Training thresholds
-  config.training_thresholds = {
-    xuatsac: parseInt(document.getElementById('cfg-te-xuatsac')?.value) || 80,
-    kha: parseInt(document.getElementById('cfg-te-kha')?.value) || 60,
-    tb: parseInt(document.getElementById('cfg-te-tb')?.value) || 40
-  };
-
   // BU list
   const buTA = document.getElementById('cfg-bu-list');
   const buLines = buTA ? buTA.value.split('\n').map(l => l.trim()).filter(l => l) : [];
@@ -4759,18 +3972,6 @@ async function saveAllConfig() {
   const month = state.config.month;
   if (!month) {
     showToast('Chưa chọn tháng.', 'error');
-    return;
-  }
-
-  // Validate training weights = 100
-  const tw = {
-    d: parseInt(document.getElementById('cfg-tw-data')?.value) || 0,
-    s: parseInt(document.getElementById('cfg-tw-solution')?.value) || 0,
-    e: parseInt(document.getElementById('cfg-tw-exec')?.value) || 0,
-    di: parseInt(document.getElementById('cfg-tw-discipline')?.value) || 0
-  };
-  if (tw.d + tw.s + tw.e + tw.di !== 100) {
-    showToast('Tổng trọng số Training phải bằng 100%.', 'error');
     return;
   }
 
@@ -4853,23 +4054,6 @@ async function copyConfigFromPrev() {
 function updateConfigSaveStatus(text) {
   const el = document.getElementById('config-save-status');
   if (el) el.textContent = text;
-}
-
-function checkTrainingWeightsTotal() {
-  const d = parseInt(document.getElementById('cfg-tw-data')?.value) || 0;
-  const s = parseInt(document.getElementById('cfg-tw-solution')?.value) || 0;
-  const e = parseInt(document.getElementById('cfg-tw-exec')?.value) || 0;
-  const di = parseInt(document.getElementById('cfg-tw-discipline')?.value) || 0;
-  const total = d + s + e + di;
-  const el = document.getElementById('cfg-tw-total-check');
-  if (!el) return;
-  if (total === 100) {
-    el.textContent = `Tổng: ${total}% ✓`;
-    el.className = 'config-hint ok';
-  } else {
-    el.textContent = `Tổng: ${total}% — cần đúng 100%`;
-    el.className = 'config-hint error';
-  }
 }
 
 function updateBUCount() {
@@ -5218,33 +4402,6 @@ function getRatingFromConfig(total, configData) {
   if (total >= thDaydu) return { label: 'Đầy đủ', cls: 'day-du' };
   if (total >= thHoihot) return { label: 'Hời hợt', cls: 'hoi-hot' };
   return { label: 'Cần cải thiện', cls: 'can-cb' };
-}
-
-/** Get training eval from config or use default */
-function getTrainingEvalFromConfig(total, configData) {
-  const t = configData && configData.training_thresholds ? configData.training_thresholds : null;
-  const thXS = t ? (t.xuatsac || 80) : 80;
-  const thK = t ? (t.kha || 60) : 60;
-  const thTB = t ? (t.tb || 40) : 40;
-
-  if (total >= thXS) return { label: 'Xuất sắc', cls: 'xuat-sac', color: '#1a7a3a' };
-  if (total >= thK) return { label: 'Khá', cls: 'kha', color: '#1a5276' };
-  if (total >= thTB) return { label: 'Trung bình', cls: 'trung-binh', color: '#c07000' };
-  return { label: 'Cần phát triển', cls: 'can-phat-trien', color: '#cc0000' };
-}
-
-/** Get training weights from config */
-function getTrainingWeights(configData) {
-  if (configData && configData.training_weights) {
-    const w = configData.training_weights;
-    return {
-      dataAnalysis: (w.data_analysis || 30) / 100,
-      solutionDesign: (w.solution_design || 30) / 100,
-      execution: (w.execution || 30) / 100,
-      discipline: (w.discipline || 10) / 100
-    };
-  }
-  return { dataAnalysis: 0.3, solutionDesign: 0.3, execution: 0.3, discipline: 0.1 };
 }
 
 // ============================================================

@@ -28,7 +28,7 @@
     <button class="header-nav-btn" data-nav="cm" onclick="navigate('cm')">CM Báo cáo</button>
 
     <button class="header-nav-btn" data-nav="dashboard" onclick="navigate('dashboard')">FM/SOD Dashboard</button>
-    <button class="header-nav-btn" data-nav="training" onclick="navigate('training')">CM Training</button>
+
     <button class="header-nav-btn header-nav-config" data-nav="config" onclick="navigate('config')">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Cấu hình
@@ -72,17 +72,7 @@
       <p>Theo dõi tiến độ Action Plan và Daily Report của tất cả 46 BU</p>
       <div class="landing-card-arrow">→</div>
     </div>
-    <div class="landing-card landing-card-training" onclick="navigate('training')">
-      <div class="landing-card-icon training-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
-          <path d="M6 12v5c3 3 9 3 12 0v-5"/>
-        </svg>
-      </div>
-      <h2>CM Training</h2>
-      <p>Đánh giá năng lực CM qua 5 tiêu chí hành vi thực tế trên platform</p>
-      <div class="landing-card-arrow">→</div>
-    </div>
+
     <div class="landing-card landing-card-config" onclick="navigate('config')">
       <div class="landing-card-icon config-icon">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -849,73 +839,7 @@
 
 </div><!-- /view-dashboard -->
 
-<!-- ===================== TRAINING VIEW ===================== -->
-<div id="view-training" class="view">
-  <div class="dash-controls training-controls">
-    <div class="training-view-title">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#1a5276">
-        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
-        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
-      </svg>
-      CM Training Dashboard
-    </div>
-    <div class="topbar-divider"></div>
-    <div class="period-display" id="training-period-display">
-      <div class="period-item">
-        <span class="period-label">Đánh giá tháng</span>
-        <span class="period-value" id="training-current-period">—</span>
-      </div>
-    </div>
-    <div class="topbar-divider"></div>
-    <span class="topbar-label">Chọn tháng</span>
-    <select id="training-period-history" class="topbar-select" style="min-width:160px" onchange="onTrainingPeriodChange()">
-    </select>
-    <button id="btn-training-analyze" class="btn btn-training-primary" onclick="runTrainingAnalysis()" style="margin-left:4px">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-      Cập nhật
-    </button>
-  </div>
-  <div id="training-summary-cards" class="training-summary-cards">
-    <div class="training-summary-placeholder">
-      <div style="text-align:center;padding:32px;color:#aaa;font-size:13px">Nhấn <strong>Cập nhật</strong> để phân tích dữ liệu CM Training</div>
-    </div>
-  </div>
-  <div class="dash-filters">
-    <input type="text" id="training-filter-search" placeholder="🔍 Tìm BU..." style="width:200px" oninput="applyTrainingFilters()">
-    <select id="training-filter-region" onchange="applyTrainingFilters()">
-      <option value="">Tất cả vùng</option>
-      <option value="HCM">HCM</option><option value="HN">HN</option><option value="MB">MB</option>
-      <option value="MN">MN</option><option value="MT">MT</option><option value="K18">K18</option><option value="ONL">ONL</option>
-    </select>
-    <select id="training-filter-eval" onchange="applyTrainingFilters()">
-      <option value="">Tất cả đánh giá</option>
-      <option value="xuat-sac">Xuất sắc</option><option value="kha">Khá</option>
-      <option value="trung-binh">Trung bình</option><option value="can-phat-trien">Cần phát triển</option>
-    </select>
-    <span id="training-filter-count" style="font-size:11px;color:#888;margin-left:4px"></span>
-  </div>
-  <div class="data-table-wrapper">
-    <table class="data-table training-table">
-      <thead>
-        <tr>
-          <th data-sort="idx" onclick="sortTrainingTable('idx')">#</th>
-          <th data-sort="bu" onclick="sortTrainingTable('bu')">BU</th>
-          <th data-sort="region" onclick="sortTrainingTable('region')">Vùng</th>
-          <th data-sort="dataAnalysis" onclick="sortTrainingTable('dataAnalysis')">🔍 Phân tích<br><small style="font-weight:400;opacity:0.8">30%</small></th>
-          <th data-sort="solutionDesign" onclick="sortTrainingTable('solutionDesign')">💡 Giải pháp<br><small style="font-weight:400;opacity:0.8">30%</small></th>
-          <th data-sort="execution" onclick="sortTrainingTable('execution')">⚡ Thực thi<br><small style="font-weight:400;opacity:0.8">30%</small></th>
-          <th data-sort="discipline" onclick="sortTrainingTable('discipline')">📋 Kỷ luật<br><small style="font-weight:400;opacity:0.8">10%</small></th>
-          <th data-sort="total" onclick="sortTrainingTable('total')">Tổng<br><small style="font-weight:400;opacity:0.8">/100</small></th>
-          <th data-sort="evalCls" onclick="sortTrainingTable('evalCls')">Đánh giá</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="training-tbody">
-        <tr><td colspan="9" style="text-align:center;padding:48px;color:#aaa;font-size:13px">Nhấn <strong>Cập nhật</strong> để phân tích năng lực CM</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div><!-- /view-training -->
+<!-- CM Training view đã xóa -->
 
 <!-- ===================== CONFIG VIEW ===================== -->
 <div id="view-config" class="view">
@@ -1179,37 +1103,7 @@
 </div>
 
 <!-- ===================== TRAINING DETAIL PANEL ===================== -->
-<div id="training-detail-panel">
-  <div class="detail-header training-detail-header">
-    <div class="detail-header-info">
-      <div class="detail-bu-name" id="training-detail-bu-name">—</div>
-      <div class="detail-meta" id="training-detail-meta"></div>
-    </div>
-    <button class="detail-close" onclick="closeTrainingDetail()" title="Đóng">✕</button>
-  </div>
 
-  <div class="detail-body">
-
-    <!-- Spider Chart -->
-    <div class="training-spider-section">
-      <div class="training-spider-title">Biểu đồ Năng lực CM (5 Tiêu chí)</div>
-      <canvas id="training-spider-canvas" width="300" height="300"></canvas>
-    </div>
-
-    <!-- Score Breakdown -->
-    <div class="training-score-breakdown">
-      <div class="detail-breakdown-title">Chi tiết từng tiêu chí</div>
-      <div id="training-detail-breakdown"></div>
-    </div>
-
-    <!-- Coaching Suggestion -->
-    <div id="training-coaching-section">
-      <div class="detail-breakdown-title">💡 Gợi ý coaching</div>
-      <div id="training-coaching-content" class="training-coaching-content"></div>
-    </div>
-
-  </div>
-</div>
 
 <!-- ===================== DISCUSSION VIEW ===================== -->
 <div id="view-discussion" class="view">
