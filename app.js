@@ -82,28 +82,57 @@ const BU_LIST = [
   "ONL - ART","ONL - COD"
 ];
 
-// Daily Report fields — KPI mới theo function group (N1=Optimize, N2=OPS, N3=Growth)
-const DAILY_FIELDS = [
-  { id: 'lead_mkt',       label: 'L1 Lead MKT',            group: 'N1', type: 'number' },
-  { id: 'calls_n1',       label: 'Số call N1',             group: 'N1', type: 'number' },
-  { id: 'trial_book',     label: 'Số Trial Book MKT',      group: 'N1', type: 'number' },
-  { id: 'trial_mkt',      label: 'L4 Trial MKT',           group: 'N1', type: 'number' },
-  { id: 'deal_n1',        label: 'L6 Deal MKT',            group: 'N1', type: 'number' },
-  { id: 'revenue_n1',     label: 'Doanh số N1 (triệu)',    group: 'N1', type: 'number' },
-  { id: 'calls_cskh',     label: 'Số call CSKH',           group: 'N2', type: 'number' },
-  { id: 'deal_reupsell',  label: 'L6 Re/Upsell',           group: 'N2', type: 'number' },
-  { id: 'lead_referral',  label: 'L2 Referral',            group: 'N2', type: 'number' },
-  { id: 'deal_referral',  label: 'L6 Referral',            group: 'N2', type: 'number' },
-  { id: 'revenue_n2',     label: 'Doanh số N2 (triệu)',    group: 'N2', type: 'number' },
-  { id: 'lead_n3',        label: 'L1 Leads tự kiếm',       group: 'N3', type: 'number' },
-  { id: 'calls_n3',       label: 'Số call N3',             group: 'N3', type: 'number' },
-  { id: 'direct_sales',   label: 'Lượt đi Direct',         group: 'N3', type: 'number' },
-  { id: 'trial_book_n3',  label: 'Số Trial Book N3',       group: 'N3', type: 'number' },
-  { id: 'trial_n3',       label: 'L4 Trials',              group: 'N3', type: 'number' },
-  { id: 'deal_n3',        label: 'L6 Deals',               group: 'N3', type: 'number' },
-  { id: 'revenue_n3',     label: 'Doanh số N3 (triệu)',    group: 'N3', type: 'number' },
-  { id: 'note',           label: 'Ghi chú',                group: 'TOTAL', type: 'text' }
+// Daily Report fields — KPI mặc định (fallback khi chưa load config)
+const DEFAULT_DAILY_FIELDS = [
+  { id: 'lead_mkt',       label: 'L1 Lead MKT',            group: 'N1', type: 'number', role: 'lead' },
+  { id: 'calls_n1',       label: 'Số call N1',             group: 'N1', type: 'number', role: 'call' },
+  { id: 'trial_book',     label: 'Số Trial Book MKT',      group: 'N1', type: 'number', role: 'trial_book' },
+  { id: 'trial_mkt',      label: 'L4 Trial MKT',           group: 'N1', type: 'number', role: 'trial' },
+  { id: 'deal_n1',        label: 'L6 Deal MKT',            group: 'N1', type: 'number', role: 'deal' },
+  { id: 'revenue_n1',     label: 'Doanh số N1 (triệu)',    group: 'N1', type: 'number', role: 'revenue' },
+  { id: 'calls_cskh',     label: 'Số call CSKH',           group: 'N2', type: 'number', role: 'call' },
+  { id: 'deal_reupsell',  label: 'L6 Re/Upsell',           group: 'N2', type: 'number', role: 'deal' },
+  { id: 'lead_referral',  label: 'L2 Referral',            group: 'N2', type: 'number', role: 'referral_lead' },
+  { id: 'deal_referral',  label: 'L6 Referral',            group: 'N2', type: 'number', role: 'deal' },
+  { id: 'revenue_n2',     label: 'Doanh số N2 (triệu)',    group: 'N2', type: 'number', role: 'revenue' },
+  { id: 'lead_n3',        label: 'L1 Leads tự kiếm',       group: 'N3', type: 'number', role: 'lead' },
+  { id: 'calls_n3',       label: 'Số call N3',             group: 'N3', type: 'number', role: 'call' },
+  { id: 'direct_sales',   label: 'Lượt đi Direct',         group: 'N3', type: 'number', role: 'activity' },
+  { id: 'trial_book_n3',  label: 'Số Trial Book N3',       group: 'N3', type: 'number', role: 'trial_book' },
+  { id: 'trial_n3',       label: 'L4 Trials',              group: 'N3', type: 'number', role: 'trial' },
+  { id: 'deal_n3',        label: 'L6 Deals',               group: 'N3', type: 'number', role: 'deal' },
+  { id: 'revenue_n3',     label: 'Doanh số N3 (triệu)',    group: 'N3', type: 'number', role: 'revenue' },
+  { id: 'note',           label: 'Ghi chú',                group: 'TOTAL', type: 'text', role: 'note' }
 ];
+
+// ===================== DYNAMIC DAILY FIELDS HELPERS =====================
+
+/** Returns active daily fields: config daily_fields if loaded, else DEFAULT_DAILY_FIELDS */
+function getDailyFields() {
+  const cfg = state.config.data;
+  if (cfg && cfg.daily_fields && Array.isArray(cfg.daily_fields.list) && cfg.daily_fields.list.length > 0) {
+    return cfg.daily_fields.list;
+  }
+  return DEFAULT_DAILY_FIELDS;
+}
+
+/** Returns fields with a specific role, optionally filtered by group */
+function getFieldsByRole(role, group) {
+  return getDailyFields().filter(f => f.role === role && (!group || f.group === group));
+}
+
+/** Sum field values for all fields matching a role (and optionally group) */
+function sumFieldsByRole(dataObj, role, group) {
+  return getFieldsByRole(role, group).reduce((s, f) => s + (parseInt(dataObj[f.id]) || 0), 0);
+}
+
+/** Generate DAILY_HEADERS dynamically from current fields */
+function getDailyHeaders() {
+  return ['bu', 'date', ...getDailyFields().map(f => f.id), 'saved_at'];
+}
+
+// Keep DAILY_FIELDS as alias for backward compatibility (read-only)
+const DAILY_FIELDS = DEFAULT_DAILY_FIELDS;
 
 const DAILY_HEADERS = [
   'bu', 'date',
@@ -1586,11 +1615,11 @@ function computeScores(allData) {
     const bu = row.bu;
     if (!dailyByBU[bu]) dailyByBU[bu] = new Set();
     if (row.date) dailyByBU[bu].add(row.date);
-    // Aggregate revenue per BU per source
+    // Aggregate revenue per BU per source (role-based)
     if (!revByBU[bu]) revByBU[bu] = { n1: 0, n2: 0, n3: 0, total: 0 };
-    const r1 = parseInt(row.revenue_n1) || 0;
-    const r2 = parseInt(row.revenue_n2) || 0;
-    const r3 = parseInt(row.revenue_n3) || 0;
+    const r1 = sumFieldsByRole(row, 'revenue', 'N1');
+    const r2 = sumFieldsByRole(row, 'revenue', 'N2');
+    const r3 = sumFieldsByRole(row, 'revenue', 'N3');
     revByBU[bu].n1 += r1;
     revByBU[bu].n2 += r2;
     revByBU[bu].n3 += r3;
@@ -4170,6 +4199,13 @@ async function loadConfigForMonth(month) {
 function populateConfigUI() {
   const d = state.config.data;
 
+  // Daily fields editor
+  if (d && d.daily_fields && Array.isArray(d.daily_fields.list)) {
+    renderDailyFieldsEditor(d.daily_fields.list);
+  } else {
+    renderDailyFieldsEditor(DEFAULT_DAILY_FIELDS);
+  }
+
   // KPI list
   const kpiTA = document.getElementById('cfg-kpi-list');
   if (kpiTA) {
@@ -4232,6 +4268,9 @@ function getNestedVal(data, section, key, fallback) {
 /** Read all form fields back into a config object */
 function readConfigFromUI() {
   const config = {};
+
+  // Daily fields
+  config.daily_fields = { list: readDailyFieldsFromEditor() };
 
   // KPI list
   const kpiTA = document.getElementById('cfg-kpi-list');
@@ -4315,6 +4354,125 @@ async function saveAllConfig() {
     showToast('Lỗi kết nối khi lưu cấu hình.', 'error');
     console.error('saveAllConfig error:', e);
   }
+}
+
+// ===================== DAILY FIELDS EDITOR (Config Tab) =====================
+
+const DAILY_FIELD_ROLES = [
+  { value: 'lead',         label: 'Lead' },
+  { value: 'call',         label: 'Số call' },
+  { value: 'trial_book',   label: 'Trial Book' },
+  { value: 'trial',        label: 'Trial Done' },
+  { value: 'deal',         label: 'Deal' },
+  { value: 'revenue',      label: 'Doanh số' },
+  { value: 'activity',     label: 'Hoạt động' },
+  { value: 'referral_lead',label: 'Lead Referral' },
+  { value: 'note',         label: 'Ghi chú (text)' }
+];
+
+const DAILY_GROUP_LABELS = {
+  N1: 'N1 — OPTIMIZE',
+  N2: 'N2 — OPS',
+  N3: 'N3 — GROWTH'
+};
+
+/** Render the daily fields editor UI from a field list */
+function renderDailyFieldsEditor(fields) {
+  ['N1', 'N2', 'N3'].forEach(group => {
+    const container = document.getElementById(`cfg-daily-${group.toLowerCase()}`);
+    if (!container) return;
+    container.innerHTML = '';
+    fields.filter(f => f.group === group).forEach(f => {
+      container.appendChild(_makeDailyFieldRow(f));
+    });
+  });
+}
+
+/** Create one field row element */
+function _makeDailyFieldRow(f) {
+  const row = document.createElement('div');
+  row.className = 'daily-field-row';
+  row.setAttribute('data-id', f.id);
+
+  const roleOptions = DAILY_FIELD_ROLES.map(r =>
+    `<option value="${r.value}"${r.value === f.role ? ' selected' : ''}>${r.label}</option>`
+  ).join('');
+
+  row.innerHTML = `
+    <span class="daily-field-drag" title="Kéo để sắp xếp">☰</span>
+    <input class="daily-field-id" value="${escHtml(f.id)}" readonly title="ID (không thể đổi sau khi tạo)">
+    <input class="daily-field-label" value="${escHtml(f.label)}" placeholder="Tên hiển thị">
+    <select class="daily-field-role">${roleOptions}</select>
+    <button class="daily-field-del" onclick="removeDailyField('${escHtml(f.id)}', this)" title="Xóa chỉ số">✕</button>
+  `;
+  return row;
+}
+
+/** Add a new field to a group */
+function addDailyField(group) {
+  const container = document.getElementById(`cfg-daily-${group.toLowerCase()}`);
+  if (!container) return;
+
+  const label = prompt(`Tên chỉ số mới (ví dụ: "Số event N3")`);
+  if (!label || !label.trim()) return;
+
+  // Auto-generate ID from label
+  const id = label.trim()
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove diacritics
+    .replace(/đ/g, 'd').replace(/\u0110/g, 'D')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .substring(0, 30);
+
+  if (!id) { showToast('Tên không hợp lệ', 'error'); return; }
+
+  // Check for duplicate IDs
+  const existing = container.closest('.config-sections').querySelectorAll('.daily-field-row');
+  for (const el of existing) {
+    if (el.getAttribute('data-id') === id) {
+      showToast(`ID "${id}" đã tồn tại, hãy dùng tên khác`, 'error');
+      return;
+    }
+  }
+
+  const newField = { id, label: label.trim(), group, type: 'number', role: 'deal' };
+  container.appendChild(_makeDailyFieldRow(newField));
+  showToast(`Đã thêm chỉ số "${label.trim()}" (ID: ${id})`);
+}
+
+/** Remove a field row */
+function removeDailyField(fieldId, btn) {
+  const row = btn ? btn.closest('.daily-field-row') : document.querySelector(`.daily-field-row[data-id="${fieldId}"]`);
+  if (!row) return;
+  if (!confirm(`Xóa chỉ số "${fieldId}"? Dữ liệu trong sheet sẽ được giữ lại nhưng không hiển thị trong form.`)) return;
+  row.remove();
+}
+
+/** Read current editor state back to a field array */
+function readDailyFieldsFromEditor() {
+  const fields = [];
+  ['N1', 'N2', 'N3'].forEach(group => {
+    const container = document.getElementById(`cfg-daily-${group.toLowerCase()}`);
+    if (!container) return;
+    container.querySelectorAll('.daily-field-row').forEach(row => {
+      const id = row.getAttribute('data-id');
+      const labelEl = row.querySelector('.daily-field-label');
+      const roleEl = row.querySelector('.daily-field-role');
+      if (!id) return;
+      const role = roleEl ? roleEl.value : 'deal';
+      const type = role === 'note' ? 'text' : 'number';
+      fields.push({
+        id,
+        label: labelEl ? labelEl.value.trim() : id,
+        group,
+        type,
+        role
+      });
+    });
+  });
+  // Always append note fields at the end (from N1/N2/N3 rows with role=note)
+  return fields;
 }
 
 /** Copy config from previous month */
@@ -4751,7 +4909,7 @@ function renderDailyForm() {
     const container = document.getElementById(`daily-fields-${group}`);
     if (!container) return;
     container.innerHTML = '';
-    const fields = DAILY_FIELDS.filter(f => f.group === group);
+    const fields = getDailyFields().filter(f => f.group === group);
     fields.forEach(f => {
       const div = document.createElement('div');
       div.className = 'daily-field';
@@ -4801,16 +4959,8 @@ function updateDailyData(fieldId, value) {
 /** Recalculate totals: Deal, Doanh số */
 function updateDailyTotals() {
   const d = state.daily.data;
-  const dealN1 = parseInt(d.deal_n1) || 0;
-  const dealReup = parseInt(d.deal_reupsell) || 0;
-  const dealRef = parseInt(d.deal_referral) || 0;
-  const dealN3 = parseInt(d.deal_n3) || 0;
-  const totalDeal = dealN1 + dealReup + dealRef + dealN3;
-
-  const revN1 = parseInt(d.revenue_n1) || 0;
-  const revN2 = parseInt(d.revenue_n2) || 0;
-  const revN3 = parseInt(d.revenue_n3) || 0;
-  const totalRev = revN1 + revN2 + revN3;
+  const totalDeal = sumFieldsByRole(d, 'deal');
+  const totalRev = sumFieldsByRole(d, 'revenue');
 
   const el1 = document.getElementById('daily-total-deal');
   if (el1) el1.value = totalDeal;
@@ -4841,7 +4991,7 @@ async function loadDailyReport() {
       const row = result.data[0];
       // Populate state from loaded data
       state.daily.data = {};
-      DAILY_FIELDS.forEach(f => {
+      getDailyFields().forEach(f => {
         const val = row[f.id];
         state.daily.data[f.id] = f.type === 'number' ? (parseInt(val) || 0) : (val || '');
       });
@@ -4854,7 +5004,7 @@ async function loadDailyReport() {
     } else {
       // No data yet — reset to defaults
       state.daily.data = {};
-      DAILY_FIELDS.forEach(f => {
+      getDailyFields().forEach(f => {
         state.daily.data[f.id] = f.type === 'number' ? 0 : '';
       });
       const indicator = document.getElementById('daily-saved-indicator');
@@ -4889,7 +5039,7 @@ async function saveDailyReport() {
 
   // Build row data
   const rowData = { bu, date };
-  DAILY_FIELDS.forEach(f => {
+  getDailyFields().forEach(f => {
     const val = state.daily.data[f.id];
     rowData[f.id] = f.type === 'number' ? (parseInt(val) || 0) : (val || '');
   });
@@ -4942,68 +5092,64 @@ async function loadDailyMTD() {
       if (metaEl) metaEl.textContent = `${bu} — Tháng ${month} — ${result.data.length} ngày`;
 
       // Calculate MTD sums
+      const activeFields = getDailyFields();
       const sums = {};
-      DAILY_FIELDS.forEach(f => {
+      activeFields.forEach(f => {
         if (f.type === 'number') sums[f.id] = 0;
       });
       result.data.forEach(row => {
-        DAILY_FIELDS.forEach(f => {
+        activeFields.forEach(f => {
           if (f.type === 'number') {
             sums[f.id] += parseInt(row[f.id]) || 0;
           }
         });
       });
-      // Totals
-      const totalDeal = (sums.deal_n1 || 0) + (sums.deal_reupsell || 0) + (sums.deal_referral || 0) + (sums.deal_n3 || 0);
-      const totalRev = (sums.revenue_n1 || 0) + (sums.revenue_n2 || 0) + (sums.revenue_n3 || 0);
+      // Totals using role-based helpers
+      const totalDeal = sumFieldsByRole(sums, 'deal');
+      const totalRev = sumFieldsByRole(sums, 'revenue');
 
-      // Auto-calculated CRs
-      const cr16 = sums.lead_mkt > 0 ? (sums.deal_n1 / sums.lead_mkt * 100) : 0;
-      const cr46 = sums.trial_mkt > 0 ? (sums.deal_n1 / sums.trial_mkt * 100) : 0;
-      const aov = sums.deal_n1 > 0 ? (sums.revenue_n1 / sums.deal_n1) : 0;
+      // Auto-calculated CRs (N1: role-based)
+      const n1Lead = sumFieldsByRole(sums, 'lead', 'N1');
+      const n1Trial = sumFieldsByRole(sums, 'trial', 'N1');
+      const n1Deal = sumFieldsByRole(sums, 'deal', 'N1');
+      const n1Rev = sumFieldsByRole(sums, 'revenue', 'N1');
+      const cr16 = n1Lead > 0 ? (n1Deal / n1Lead * 100) : 0;
+      const cr46 = n1Trial > 0 ? (n1Deal / n1Trial * 100) : 0;
+      const aov = n1Deal > 0 ? (n1Rev / n1Deal) : 0;
 
       // Render MTD content
       const content = document.getElementById('daily-mtd-content');
       if (!content) return;
 
-      // Section: N1
-      let html = '<div class="daily-mtd-group"><div class="daily-mtd-group-title">N1 — OPTIMIZE</div>';
-      ['lead_mkt','calls_n1','trial_book','trial_mkt','deal_n1','revenue_n1'].forEach(id => {
-        const f = DAILY_FIELDS.find(x => x.id === id);
-        const val = id === 'revenue_n1' ? `${sums[id]}M` : sums[id];
-        html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">${escHtml(f.label)}</span><span class="daily-mtd-item-value">${val}</span></div>`;
+      // Render groups dynamically
+      const groupConfig = [
+        { key: 'N1', title: 'N1 — OPTIMIZE' },
+        { key: 'N2', title: 'N2 — OPS' },
+        { key: 'N3', title: 'N3 — GROWTH' }
+      ];
+      let html = '';
+      groupConfig.forEach(gc => {
+        const groupFields = activeFields.filter(f => f.group === gc.key);
+        if (groupFields.length === 0) return;
+        html += `<div class="daily-mtd-group"><div class="daily-mtd-group-title">${gc.title}</div>`;
+        groupFields.forEach(f => {
+          const val = f.role === 'revenue' ? `${sums[f.id] || 0}M` : (sums[f.id] || 0);
+          html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">${escHtml(f.label)}</span><span class="daily-mtd-item-value">${val}</span></div>`;
+        });
+        html += '</div>';
       });
-      html += '</div>';
-
-      // Section: N2
-      html += '<div class="daily-mtd-group"><div class="daily-mtd-group-title">N2 — OPS</div>';
-      ['calls_cskh','deal_reupsell','lead_referral','deal_referral','revenue_n2'].forEach(id => {
-        const f = DAILY_FIELDS.find(x => x.id === id);
-        const val = id === 'revenue_n2' ? `${sums[id]}M` : sums[id];
-        html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">${escHtml(f.label)}</span><span class="daily-mtd-item-value">${val}</span></div>`;
-      });
-      html += '</div>';
-
-      // Section: N3
-      html += '<div class="daily-mtd-group"><div class="daily-mtd-group-title">N3 — GROWTH</div>';
-      ['lead_n3','calls_n3','direct_sales','trial_book_n3','trial_n3','deal_n3','revenue_n3'].forEach(id => {
-        const f = DAILY_FIELDS.find(x => x.id === id);
-        const val = id === 'revenue_n3' ? `${sums[id]}M` : sums[id];
-        html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">${escHtml(f.label)}</span><span class="daily-mtd-item-value">${val}</span></div>`;
-      });
-      html += '</div>';
 
       // Totals
-      html += '<div class="daily-mtd-group daily-mtd-group-total"><div class="daily-mtd-group-title">TỔNG HỢP MTD</div>';
+      html += '<div class="daily-mtd-group daily-mtd-group-total"><div class="daily-mtd-group-title">TỔỆNG HỢP MTD</div>';
       html += `<div class="daily-mtd-item daily-mtd-item-total"><span class="daily-mtd-item-label">Tổng Deal BU</span><span class="daily-mtd-item-value">${totalDeal}</span></div>`;
       html += `<div class="daily-mtd-item daily-mtd-item-total"><span class="daily-mtd-item-label">Tổng Doanh số</span><span class="daily-mtd-item-value">${totalRev}M</span></div>`;
       html += '</div>';
 
       // Auto-calculated KPIs
-      html += '<div class="daily-mtd-group daily-mtd-group-kpi"><div class="daily-mtd-group-title">CHỈ SỐ TỰ TÍNH</div>';
-      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">CR16 (Deal N1 / Lead MKT)</span><span class="daily-mtd-item-value">${cr16.toFixed(1)}%</span></div>`;
-      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">CR46 (Deal N1 / Trial MKT)</span><span class="daily-mtd-item-value">${cr46.toFixed(1)}%</span></div>`;
-      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">AOV (DS N1 / Deal N1)</span><span class="daily-mtd-item-value">${aov.toFixed(1)}M</span></div>`;
+      html += '<div class="daily-mtd-group daily-mtd-group-kpi"><div class="daily-mtd-group-title">CHỆ SỐ TỰ TÍNH</div>';
+      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">CR16 (Deal N1 / Lead N1)</span><span class="daily-mtd-item-value">${cr16.toFixed(1)}%</span></div>`;
+      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">CR46 (Deal N1 / Trial N1)</span><span class="daily-mtd-item-value">${cr46.toFixed(1)}%</span></div>`;
+      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">AOV N1 (DS N1 / Deal N1)</span><span class="daily-mtd-item-value">${aov.toFixed(1)}M</span></div>`;
       html += '</div>';
 
       content.innerHTML = html;
@@ -5022,8 +5168,9 @@ async function loadDailyMTD() {
 
 state.dailyOps = {
   month: '',
-  rawData: null,  // all daily rows for the month
-  sums: null      // computed aggregates
+  rawData: null,   // all daily rows for current month
+  _prevData: null, // all daily rows for previous month (MoM)
+  sums: null       // computed aggregates
 };
 
 function switchDashTab(tab) {
@@ -5088,40 +5235,53 @@ async function loadDailyOps() {
   if (empty) empty.style.display = 'none';
   if (content) content.style.display = 'none';
 
-  try {
-    // Try getDailyAll first (requires updated Apps Script)
-    let allData = null;
-    try {
-      const result = await apiFetch('getDailyAll', { month });
-      if (result.ok && result.data && result.data.length > 0) {
-        allData = result.data;
-      }
-    } catch (e) {
-      console.log('getDailyAll not available, falling back to per-BU fetch...');
-    }
+  // Calculate previous month for MoM comparison
+  const [yr, mo] = month.split('-');
+  const prevDate = new Date(parseInt(yr), parseInt(mo) - 2, 1);
+  const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
 
-    // Fallback: fetch each BU's MTD data via getDailyMTD
-    if (!allData) {
-      allData = [];
+  try {
+    // Helper: fetch all daily rows for a given month
+    async function fetchDailyData(targetMonth) {
+      // Try getDailyAll first (requires updated Apps Script)
+      try {
+        const result = await apiFetch('getDailyAll', { month: targetMonth });
+        if (result.ok && result.data && result.data.length > 0) {
+          return result.data;
+        }
+      } catch (e) {
+        console.log('getDailyAll not available, falling back to per-BU fetch...');
+      }
+      // Fallback: fetch each BU's MTD data via getDailyMTD
+      let rows = [];
       const fetchPromises = BU_LIST.map(async (bu) => {
         try {
-          const r = await apiFetch('getDailyMTD', { bu, month });
+          const r = await apiFetch('getDailyMTD', { bu, month: targetMonth });
           if (r.ok && r.data) return r.data;
         } catch (e) { /* skip */ }
         return [];
       });
       const results = await Promise.all(fetchPromises);
-      results.forEach(rows => { allData = allData.concat(rows); });
+      results.forEach(r => { rows = rows.concat(r); });
+      return rows;
     }
+
+    // Fetch current and previous month in parallel
+    const [allData, prevData] = await Promise.all([
+      fetchDailyData(month),
+      fetchDailyData(prevMonth).catch(() => [])
+    ]);
 
     if (loading) loading.style.display = 'none';
 
     if (allData.length > 0) {
       state.dailyOps.rawData = allData;
+      state.dailyOps._prevData = prevData || [];
       if (content) content.style.display = '';
       renderDailyOps();
     } else {
       state.dailyOps.rawData = null;
+      state.dailyOps._prevData = [];
       if (empty) {
         empty.style.display = '';
         empty.textContent = `Ch\u01B0a c\u00F3 d\u1EEF li\u1EC7u Daily Report cho th\u00E1ng ${month}`;
@@ -5137,38 +5297,36 @@ async function loadDailyOps() {
   }
 }
 
-function renderDailyOps() {
-  const data = state.dailyOps.rawData;
-  if (!data) return;
+/** Compute MoM delta between current and previous raw values */
+function computeDelta(current, prev) {
+  const c = Number(current) || 0;
+  const p = Number(prev) || 0;
+  if (!p || p === 0) return { icon: '\u2014', text: '', cls: 'dops-delta-neutral' };
+  const pct = ((c - p) / Math.abs(p) * 100);
+  if (Math.abs(pct) < 0.5) return { icon: '\u2014', text: '0%', cls: 'dops-delta-neutral' };
+  if (pct > 0) return { icon: '\u25B2', text: `+${pct.toFixed(1)}%`, cls: 'dops-delta-up' };
+  return { icon: '\u25BC', text: `${pct.toFixed(1)}%`, cls: 'dops-delta-down' };
+}
 
-  const sourceFilter = document.getElementById('dops-source')?.value || 'ALL';
-  const buFilter = document.getElementById('dops-bu')?.value || 'ALL';
-
-  // Filter by BU
-  const filtered = buFilter === 'ALL' ? data : data.filter(r => r.bu === buFilter);
-
-  // Compute sums
+/** Helper: compute sums object from a filtered data array */
+function computeDopsums(rows, buFilter) {
+  const filtered = buFilter === 'ALL' ? rows : rows.filter(r => r.bu === buFilter);
   const s = {};
-  DAILY_FIELDS.forEach(f => { if (f.type === 'number') s[f.id] = 0; });
+  getDailyFields().forEach(f => { if (f.type === 'number') s[f.id] = 0; });
   filtered.forEach(row => {
-    DAILY_FIELDS.forEach(f => {
+    getDailyFields().forEach(f => {
       if (f.type === 'number') s[f.id] += parseInt(row[f.id]) || 0;
     });
   });
-
-  // Totals (raw sums — may contain data entry outliers)
-  const totalRev = (s.revenue_n1||0) + (s.revenue_n2||0) + (s.revenue_n3||0);
-
-  // --- Outlier filtering: remove rows where deal count > 1000 (likely revenue entered in deal field) ---
+  // Outlier filtering for deal counts
   const cleanFiltered = filtered.map(row => {
     const r = Object.assign({}, row);
-    if ((parseInt(r.deal_n1)||0) > 1000) { r.deal_n1 = 0; }
-    if ((parseInt(r.deal_reupsell)||0) > 1000) { r.deal_reupsell = 0; }
-    if ((parseInt(r.deal_referral)||0) > 1000) { r.deal_referral = 0; }
-    if ((parseInt(r.deal_n3)||0) > 1000) { r.deal_n3 = 0; }
+    if ((parseInt(r.deal_n1)||0) > 1000) r.deal_n1 = 0;
+    if ((parseInt(r.deal_reupsell)||0) > 1000) r.deal_reupsell = 0;
+    if ((parseInt(r.deal_referral)||0) > 1000) r.deal_referral = 0;
+    if ((parseInt(r.deal_n3)||0) > 1000) r.deal_n3 = 0;
     return r;
   });
-  // Recompute clean deal sums for CR calculations
   let cleanDealN1 = 0, cleanDealReupsell = 0, cleanDealReferral = 0, cleanDealN3 = 0;
   cleanFiltered.forEach(row => {
     cleanDealN1 += parseInt(row.deal_n1) || 0;
@@ -5178,107 +5336,179 @@ function renderDailyOps() {
   });
   const cleanDealN2 = cleanDealReupsell + cleanDealReferral;
   const cleanDealTotal = cleanDealN1 + cleanDealN2 + cleanDealN3;
-
-  // Per-source CRs (using clean deal counts)
-  // N1: CR16 = Deal N1 / Lead MKT, CR46 = Deal N1 / Trial MKT, AOV N1
+  const totalRev = (s.revenue_n1||0) + (s.revenue_n2||0) + (s.revenue_n3||0);
+  // CRs
   const cr16_n1 = s.lead_mkt > 0 ? (cleanDealN1 / s.lead_mkt * 100) : 0;
   const cr46_n1 = (s.trial_mkt||0) > 0 ? (cleanDealN1 / s.trial_mkt * 100) : 0;
   const aov_n1 = cleanDealN1 > 0 ? (s.revenue_n1 / cleanDealN1) : 0;
-
-  // N2: CR Re/Upsell = Deal ReUpsell / Lead Referral, CR Referral = Deal Ref / Lead Referral
   const crReupsell = (s.lead_referral||0) > 0 ? (cleanDealReupsell / s.lead_referral * 100) : 0;
   const crReferral = (s.lead_referral||0) > 0 ? (cleanDealReferral / s.lead_referral * 100) : 0;
   const aov_n2 = cleanDealN2 > 0 ? (s.revenue_n2 / cleanDealN2) : 0;
-
-  // N3: CR16 = Deal N3 / Lead N3, CR46 = Deal N3 / Trial N3, AOV N3
   const cr16_n3 = s.lead_n3 > 0 ? (cleanDealN3 / s.lead_n3 * 100) : 0;
   const cr46_n3 = s.trial_n3 > 0 ? (cleanDealN3 / s.trial_n3 * 100) : 0;
   const aov_n3 = cleanDealN3 > 0 ? (s.revenue_n3 / cleanDealN3) : 0;
-
-  // Unique BUs and days
-  const uniqueBUs = new Set(filtered.map(r => r.bu));
-  const uniqueDays = new Set(filtered.map(r => r.date));
-
-  // Update meta
-  const metaEl = document.getElementById('dops-meta');
-  if (metaEl) {
-    const label = buFilter === 'ALL' ? `${uniqueBUs.size} BU` : buFilter;
-    metaEl.textContent = `${label} \u2014 ${uniqueDays.size} ng\u00E0y \u2014 Th\u00E1ng ${state.dailyOps.month}`;
-  }
-
-  // Blended KPIs (using clean deal counts)
   const totalLeadAll = (s.lead_mkt||0) + (s.lead_n3||0);
   const totalTrialAll = (s.trial_mkt||0) + (s.trial_n3||0);
   const cleanDealBlend = cleanDealN1 + cleanDealN3;
   const cr16 = totalLeadAll > 0 ? (cleanDealBlend / totalLeadAll * 100) : 0;
   const cr46 = totalTrialAll > 0 ? (cleanDealBlend / totalTrialAll * 100) : 0;
   const aovAll = cleanDealTotal > 0 ? (totalRev / cleanDealTotal) : 0;
+  const uniqueBUs = new Set(filtered.map(r => r.bu));
+  const uniqueDays = new Set(filtered.map(r => r.date));
+  return {
+    raw: s, filtered, uniqueBUs, uniqueDays,
+    cleanDealN1, cleanDealReupsell, cleanDealReferral, cleanDealN3,
+    cleanDealN2, cleanDealTotal, totalRev,
+    cr16_n1, cr46_n1, aov_n1,
+    crReupsell, crReferral, aov_n2,
+    cr16_n3, cr46_n3, aov_n3,
+    cr16, cr46, aovAll
+  };
+}
 
-  // KPI Cards — formatted
-  setText('dops-total-deal', fmtDops(cleanDealTotal, 'count'));
-  setText('dops-total-revenue', fmtDops(totalRev, 'money'));
+function renderDailyOps() {
+  const data = state.dailyOps.rawData;
+  if (!data) return;
 
-  const aovM = aovAll / 1e6; // VNĐ → triệu for benchmark comparison
-  const cr16El = document.getElementById('dops-cr16');
-  if (cr16El) {
-    cr16El.textContent = fmtDops(cr16, 'pct');
-    cr16El.className = 'dops-kpi-value ' + (cr16 >= 15 ? 'dops-kpi-good' : cr16 >= 10 ? 'dops-kpi-warn' : 'dops-kpi-bad');
-  }
-  const cr46El = document.getElementById('dops-cr46');
-  if (cr46El) {
-    cr46El.textContent = fmtDops(cr46, 'pct');
-    cr46El.className = 'dops-kpi-value ' + (cr46 >= 50 ? 'dops-kpi-good' : cr46 >= 35 ? 'dops-kpi-warn' : 'dops-kpi-bad');
-  }
-  const aovEl = document.getElementById('dops-aov');
-  if (aovEl) {
-    aovEl.textContent = fmtDops(aovAll, 'aov');
-    aovEl.className = 'dops-kpi-value ' + (aovM >= 18 ? 'dops-kpi-good' : aovM >= 15 ? 'dops-kpi-warn' : 'dops-kpi-bad');
-  }
-  setText('dops-noshow', '--');
+  const sourceFilter = document.getElementById('dops-source')?.value || 'ALL';
+  const buFilter = document.getElementById('dops-bu')?.value || 'ALL';
 
-  // Render N1 metrics
+  // Compute current and previous month aggregates
+  const cur = computeDopsums(data, buFilter);
+  const prevRaw = state.dailyOps._prevData || [];
+  const prev = prevRaw.length > 0 ? computeDopsums(prevRaw, buFilter) : null;
+
+  const s = cur.raw;
+
+  // Update meta
+  const metaEl = document.getElementById('dops-meta');
+  if (metaEl) {
+    const label = buFilter === 'ALL' ? `${cur.uniqueBUs.size} BU` : buFilter;
+    metaEl.textContent = `${label} \u2014 ${cur.uniqueDays.size} ng\u00E0y \u2014 Th\u00E1ng ${state.dailyOps.month}`;
+  }
+
+  const aovM = cur.aovAll / 1e6;
+
+  // ---- KPI Cards (redesigned with MoM) ----
+  // Total Deal card
+  renderDopsKpiCard('dops-kpi-deal-card', {
+    value: fmtDops(cur.cleanDealTotal, 'count'),
+    rawCur: cur.cleanDealTotal,
+    rawPrev: prev ? prev.cleanDealTotal : null,
+    prevFmt: prev ? fmtDops(prev.cleanDealTotal, 'count') : null,
+    higherIsBetter: true
+  });
+  // Total Revenue card
+  renderDopsKpiCard('dops-kpi-revenue-card', {
+    value: fmtDops(cur.totalRev, 'money'),
+    rawCur: cur.totalRev,
+    rawPrev: prev ? prev.totalRev : null,
+    prevFmt: prev ? fmtDops(prev.totalRev, 'money') : null,
+    higherIsBetter: true
+  });
+  // CR16 card
+  const cr16Cls = cur.cr16 >= 15 ? 'dops-kpi-good' : cur.cr16 >= 10 ? 'dops-kpi-warn' : 'dops-kpi-bad';
+  renderDopsKpiCard('dops-kpi-cr16-card', {
+    value: fmtDops(cur.cr16, 'pct'),
+    valueCls: cr16Cls,
+    rawCur: cur.cr16,
+    rawPrev: prev ? prev.cr16 : null,
+    prevFmt: prev ? fmtDops(prev.cr16, 'pct') : null,
+    higherIsBetter: true
+  });
+  // CR46 card
+  const cr46Cls = cur.cr46 >= 50 ? 'dops-kpi-good' : cur.cr46 >= 35 ? 'dops-kpi-warn' : 'dops-kpi-bad';
+  renderDopsKpiCard('dops-kpi-cr46-card', {
+    value: fmtDops(cur.cr46, 'pct'),
+    valueCls: cr46Cls,
+    rawCur: cur.cr46,
+    rawPrev: prev ? prev.cr46 : null,
+    prevFmt: prev ? fmtDops(prev.cr46, 'pct') : null,
+    higherIsBetter: true
+  });
+  // AOV card
+  const aovCls = aovM >= 18 ? 'dops-kpi-good' : aovM >= 15 ? 'dops-kpi-warn' : 'dops-kpi-bad';
+  renderDopsKpiCard('dops-kpi-aov-card', {
+    value: fmtDops(cur.aovAll, 'aov'),
+    valueCls: aovCls,
+    rawCur: cur.aovAll,
+    rawPrev: prev ? prev.aovAll : null,
+    prevFmt: prev ? fmtDops(prev.aovAll, 'aov') : null,
+    higherIsBetter: true
+  });
+  // No-show card
+  renderDopsKpiCard('dops-kpi-noshow-card', {
+    value: '--',
+    rawCur: null,
+    rawPrev: null,
+    prevFmt: null,
+    higherIsBetter: false
+  });
+
+  // ---- N1 Section ----
   renderDopsSection('dops-metrics-n1', [
-    { label: 'L1 Lead MKT', value: fmtDops(s.lead_mkt, 'count') },
-    { label: 'S\u1ED1 call N1', value: fmtDops(s.calls_n1, 'count') },
-    { label: 'L4 Trial MKT', value: fmtDops(s.trial_mkt, 'count') },
-    { label: 'L6 Deal MKT', value: fmtDops(cleanDealN1, 'count') },
-    { label: 'Doanh s\u1ED1 N1', value: fmtDops(s.revenue_n1, 'money') }
+    { label: 'L1 Lead MKT', icon: '\uD83D\uDCE3', value: fmtDops(s.lead_mkt, 'count'),
+      rawCur: s.lead_mkt, rawPrev: prev ? prev.raw.lead_mkt : null, type: 'count', higherIsBetter: true },
+    { label: 'S\u1ED1 cu\u1ED9c g\u1ECDi N1', icon: '\uD83D\uDCDE', value: fmtDops(s.calls_n1, 'count'),
+      rawCur: s.calls_n1, rawPrev: prev ? prev.raw.calls_n1 : null, type: 'count', higherIsBetter: true },
+    { label: 'L4 Trial MKT', icon: '\u2705', value: fmtDops(s.trial_mkt, 'count'),
+      rawCur: s.trial_mkt, rawPrev: prev ? prev.raw.trial_mkt : null, type: 'count', higherIsBetter: true },
+    { label: 'L6 Deal MKT', icon: '\uD83C\uDFC6', value: fmtDops(cur.cleanDealN1, 'count'),
+      rawCur: cur.cleanDealN1, rawPrev: prev ? prev.cleanDealN1 : null, type: 'count', higherIsBetter: true },
+    { label: 'Doanh s\u1ED1 N1', icon: '\uD83D\uDCB0', value: fmtDops(s.revenue_n1, 'money'),
+      rawCur: s.revenue_n1, rawPrev: prev ? prev.raw.revenue_n1 : null, type: 'money', higherIsBetter: true }
   ]);
-  // N1 CR strip
   renderCRStrip('dops-cr-n1', [
-    { label: 'CR16 (N1)', value: cr16_n1, bench: 15, benchLabel: 'BM: 15%' },
-    { label: 'CR46 (N1)', value: cr46_n1, bench: 50, benchLabel: 'BM: 50%' },
-    { label: 'AOV (N1)', value: aov_n1, suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
+    { label: 'CR16 (N1)', value: cur.cr16_n1, rawPrev: prev ? prev.cr16_n1 : null,
+      bench: 15, benchLabel: 'BM: 15%' },
+    { label: 'CR46 (N1)', value: cur.cr46_n1, rawPrev: prev ? prev.cr46_n1 : null,
+      bench: 50, benchLabel: 'BM: 50%' },
+    { label: 'AOV (N1)', value: cur.aov_n1, rawPrev: prev ? prev.aov_n1 : null,
+      suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
   ]);
 
-  // Render N2 metrics
+  // ---- N2 Section ----
   renderDopsSection('dops-metrics-n2', [
-    { label: 'S\u1ED1 call CSKH', value: fmtDops(s.calls_cskh, 'count') },
-    { label: 'L6 Re/Upsell', value: fmtDops(cleanDealReupsell, 'count') },
-    { label: 'L2 Referral', value: fmtDops(s.lead_referral, 'count') },
-    { label: 'L6 Referral', value: fmtDops(cleanDealReferral, 'count') },
-    { label: 'Doanh s\u1ED1 N2', value: fmtDops(s.revenue_n2, 'money') }
+    { label: 'S\u1ED1 cu\u1ED9c g\u1ECDi CSKH', icon: '\uD83D\uDCF1', value: fmtDops(s.calls_cskh, 'count'),
+      rawCur: s.calls_cskh, rawPrev: prev ? prev.raw.calls_cskh : null, type: 'count', higherIsBetter: true },
+    { label: 'L6 Re/Upsell', icon: '\uD83D\uDD04', value: fmtDops(cur.cleanDealReupsell, 'count'),
+      rawCur: cur.cleanDealReupsell, rawPrev: prev ? prev.cleanDealReupsell : null, type: 'count', higherIsBetter: true },
+    { label: 'L2 Referral', icon: '\uD83E\uDD1D', value: fmtDops(s.lead_referral, 'count'),
+      rawCur: s.lead_referral, rawPrev: prev ? prev.raw.lead_referral : null, type: 'count', higherIsBetter: true },
+    { label: 'L6 Referral', icon: '\uD83C\uDFC6', value: fmtDops(cur.cleanDealReferral, 'count'),
+      rawCur: cur.cleanDealReferral, rawPrev: prev ? prev.cleanDealReferral : null, type: 'count', higherIsBetter: true },
+    { label: 'Doanh s\u1ED1 N2', icon: '\uD83D\uDCB0', value: fmtDops(s.revenue_n2, 'money'),
+      rawCur: s.revenue_n2, rawPrev: prev ? prev.raw.revenue_n2 : null, type: 'money', higherIsBetter: true }
   ]);
-  // N2 CR strip
   renderCRStrip('dops-cr-n2', [
-    { label: 'CR Re/Upsell', value: crReupsell, bench: null },
-    { label: 'CR Referral', value: crReferral, bench: null },
-    { label: 'AOV (N2)', value: aov_n2, suffix: 'AOV', bench: null }
+    { label: 'CR Re/Upsell', value: cur.crReupsell, rawPrev: prev ? prev.crReupsell : null,
+      bench: null },
+    { label: 'CR Referral', value: cur.crReferral, rawPrev: prev ? prev.crReferral : null,
+      bench: null },
+    { label: 'AOV (N2)', value: cur.aov_n2, rawPrev: prev ? prev.aov_n2 : null,
+      suffix: 'AOV', bench: null }
   ]);
 
-  // Render N3 metrics
+  // ---- N3 Section ----
   renderDopsSection('dops-metrics-n3', [
-    { label: 'L1 Leads t\u1EF1 ki\u1EBFm', value: fmtDops(s.lead_n3, 'count') },
-    { label: 'S\u1ED1 call N3', value: fmtDops(s.calls_n3, 'count') },
-    { label: 'L4 Trials', value: fmtDops(s.trial_n3, 'count') },
-    { label: 'L6 Deals', value: fmtDops(cleanDealN3, 'count') },
-    { label: 'Doanh s\u1ED1 N3', value: fmtDops(s.revenue_n3, 'money') }
+    { label: 'L1 Leads t\u1EF1 ki\u1EBFm', icon: '\uD83D\uDD0D', value: fmtDops(s.lead_n3, 'count'),
+      rawCur: s.lead_n3, rawPrev: prev ? prev.raw.lead_n3 : null, type: 'count', higherIsBetter: true },
+    { label: 'S\u1ED1 cu\u1ED9c g\u1ECDi N3', icon: '\uD83D\uDCDE', value: fmtDops(s.calls_n3, 'count'),
+      rawCur: s.calls_n3, rawPrev: prev ? prev.raw.calls_n3 : null, type: 'count', higherIsBetter: true },
+    { label: 'L4 Trials', icon: '\u2705', value: fmtDops(s.trial_n3, 'count'),
+      rawCur: s.trial_n3, rawPrev: prev ? prev.raw.trial_n3 : null, type: 'count', higherIsBetter: true },
+    { label: 'L6 Deals', icon: '\uD83C\uDFC6', value: fmtDops(cur.cleanDealN3, 'count'),
+      rawCur: cur.cleanDealN3, rawPrev: prev ? prev.cleanDealN3 : null, type: 'count', higherIsBetter: true },
+    { label: 'Doanh s\u1ED1 N3', icon: '\uD83D\uDCB0', value: fmtDops(s.revenue_n3, 'money'),
+      rawCur: s.revenue_n3, rawPrev: prev ? prev.raw.revenue_n3 : null, type: 'money', higherIsBetter: true }
   ]);
-  // N3 CR strip
   renderCRStrip('dops-cr-n3', [
-    { label: 'CR16 (N3)', value: cr16_n3, bench: 15, benchLabel: 'BM: 15%' },
-    { label: 'CR46 (N3)', value: cr46_n3, bench: 50, benchLabel: 'BM: 50%' },
-    { label: 'AOV (N3)', value: aov_n3, suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
+    { label: 'CR16 (N3)', value: cur.cr16_n3, rawPrev: prev ? prev.cr16_n3 : null,
+      bench: 15, benchLabel: 'BM: 15%' },
+    { label: 'CR46 (N3)', value: cur.cr46_n3, rawPrev: prev ? prev.cr46_n3 : null,
+      bench: 50, benchLabel: 'BM: 50%' },
+    { label: 'AOV (N3)', value: cur.aov_n3, rawPrev: prev ? prev.aov_n3 : null,
+      suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
   ]);
 
   // Source filter visibility
@@ -5286,50 +5516,113 @@ function renderDailyOps() {
   document.getElementById('dops-section-n2').style.display = (sourceFilter === 'ALL' || sourceFilter === 'N2') ? '' : 'none';
   document.getElementById('dops-section-n3').style.display = (sourceFilter === 'ALL' || sourceFilter === 'N3') ? '' : 'none';
 
-  // Coverage
+  // Coverage line
   const coverageEl = document.getElementById('dops-coverage-text');
   if (coverageEl) {
-    coverageEl.textContent = `${uniqueBUs.size} BU \u0111\u00E3 b\u00E1o c\u00E1o / ${BU_LIST.length} BU t\u1ED5ng \u2014 ${filtered.length} b\u1EA3n ghi t\u1EEB ${uniqueDays.size} ng\u00E0y`;
+    coverageEl.textContent = `${cur.uniqueBUs.size} BU \u0111\u00E3 b\u00E1o c\u00E1o / ${BU_LIST.length} BU t\u1ED5ng \u2014 ${cur.filtered.length} b\u1EA3n ghi t\u1EEB ${cur.uniqueDays.size} ng\u00E0y`;
   }
 }
 
+/** Render a redesigned KPI card with MoM comparison */
+function renderDopsKpiCard(cardId, opts) {
+  const el = document.getElementById(cardId);
+  if (!el) return;
+  const valueEl = el.querySelector('.dops-kpi-value');
+  const momEl = el.querySelector('.dops-kpi-mom');
+  if (valueEl) {
+    valueEl.textContent = opts.value;
+    if (opts.valueCls) valueEl.className = 'dops-kpi-value ' + opts.valueCls;
+  }
+  if (momEl) {
+    if (opts.rawCur !== null && opts.rawPrev !== null && opts.prevFmt !== null) {
+      const delta = computeDelta(opts.rawCur, opts.rawPrev);
+      // For metrics where lower is better, invert the color
+      const effectiveCls = opts.higherIsBetter ? delta.cls :
+        (delta.cls === 'dops-delta-up' ? 'dops-delta-down' :
+         delta.cls === 'dops-delta-down' ? 'dops-delta-up' : 'dops-delta-neutral');
+      momEl.innerHTML = `<span class="dops-delta ${effectiveCls}">${delta.icon} ${delta.text}</span><span class="dops-prev-val">T.tr\u01B0\u1EDBc: ${opts.prevFmt}</span>`;
+      momEl.style.display = '';
+    } else {
+      momEl.style.display = 'none';
+    }
+  }
+}
+
+/** Render metric grid inside a source section */
 function renderDopsSection(containerId, metrics) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  // Dynamically set grid columns based on metric count
   el.className = 'dops-metrics' + (metrics.length === 5 ? ' dops-cols-5' : '');
-  el.innerHTML = metrics.map(m =>
-    `<div class="dops-metric">
+  el.innerHTML = metrics.map(m => {
+    let momHtml = '';
+    if (m.rawPrev !== null && m.rawPrev !== undefined) {
+      const delta = computeDelta(m.rawCur, m.rawPrev);
+      const effectiveCls = m.higherIsBetter ? delta.cls :
+        (delta.cls === 'dops-delta-up' ? 'dops-delta-down' :
+         delta.cls === 'dops-delta-down' ? 'dops-delta-up' : 'dops-delta-neutral');
+      const prevFmt = m.type === 'money' ? fmtDops(m.rawPrev, 'money') : fmtDops(m.rawPrev, 'count');
+      momHtml = `<div class="dops-metric-mom">
+        <span class="dops-delta ${effectiveCls}">${delta.icon} ${delta.text}</span>
+        <span class="dops-prev-val">T.tr\u01B0\u1EDBc: ${prevFmt}</span>
+      </div>`;
+    }
+    const warnHtml = (m.type === 'count' && (Number(m.rawCur) || 0) > 100000)
+      ? `<span class="dops-warn-icon" title="Gi\u00E1 tr\u1ECB b\u1EA5t th\u01B0\u1EDDng — ki\u1EC3m tra l\u1EA1i d\u1EEF li\u1EC7u">\u26A0\uFE0F</span>` : '';
+    return `<div class="dops-metric">
+      <div class="dops-metric-icon">${m.icon || ''}</div>
       <div class="dops-metric-label">${m.label}</div>
-      <div class="dops-metric-value">${m.value}</div>
-    </div>`
-  ).join('');
+      <div class="dops-metric-value">${m.value}${warnHtml}</div>
+      ${momHtml}
+    </div>`;
+  }).join('');
 }
 
+/** Render CR strip with progress bars and MoM */
 function renderCRStrip(containerId, chips) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = chips.map(c => {
     const val = c.value || 0;
     const isAOV = c.suffix === 'AOV';
-    // AOV value is in VNĐ → convert to triệu for display & benchmark
     const aovM = isAOV ? val / 1e6 : 0;
     const display = isAOV ? fmtDops(val, 'aov') : fmtDops(val, 'pct');
     let colorClass = 'dops-cr-neutral';
+    let pct = 0;
     if (c.bench !== null && c.bench !== undefined) {
       if (c.invert) {
         colorClass = val <= c.bench ? 'dops-cr-good' : val <= c.bench * 1.5 ? 'dops-cr-warn' : 'dops-cr-bad';
+        pct = c.bench > 0 ? Math.min(100, (c.bench / Math.max(val, 0.01)) * 100) : 0;
       } else if (isAOV) {
         colorClass = aovM >= c.bench ? 'dops-cr-good' : aovM >= c.bench * 0.8 ? 'dops-cr-warn' : 'dops-cr-bad';
+        pct = Math.min(100, (aovM / c.bench) * 100);
       } else {
         colorClass = val >= c.bench ? 'dops-cr-good' : val >= c.bench * 0.7 ? 'dops-cr-warn' : 'dops-cr-bad';
+        pct = Math.min(100, (val / c.bench) * 100);
       }
+    } else {
+      // No benchmark — use 100% fill as neutral
+      pct = 100;
     }
+    // MoM for CR chip
+    let crMomHtml = '';
+    if (c.rawPrev !== null && c.rawPrev !== undefined) {
+      const delta = computeDelta(val, c.rawPrev);
+      const prevDisp = isAOV ? fmtDops(c.rawPrev, 'aov') : fmtDops(c.rawPrev, 'pct');
+      crMomHtml = `<div class="dops-cr-mom">
+        <span class="dops-delta ${delta.cls}">${delta.icon} ${delta.text}</span>
+        <span class="dops-prev-val">T.tr\u01B0\u1EDBc: ${prevDisp}</span>
+      </div>`;
+    }
+    const barColorVar = colorClass === 'dops-cr-good' ? 'var(--green)' :
+      colorClass === 'dops-cr-warn' ? 'var(--orange)' :
+      colorClass === 'dops-cr-bad' ? 'var(--red)' : 'var(--gray-300)';
     const benchHtml = c.benchLabel ? `<div class="dops-cr-chip-bench">${c.benchLabel}</div>` : '';
     return `<div class="dops-cr-chip">
       <div class="dops-cr-chip-label">${c.label}</div>
       <div class="dops-cr-chip-value ${colorClass}">${display}</div>
+      <div class="dops-cr-bar-track"><div class="dops-cr-bar-fill" style="width:${pct.toFixed(1)}%;background:${barColorVar}"></div></div>
       ${benchHtml}
+      ${crMomHtml}
     </div>`;
   }).join('');
 }

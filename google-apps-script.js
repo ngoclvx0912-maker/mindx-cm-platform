@@ -119,6 +119,8 @@ function doGet(e) {
       return handleGetDailyMTD(params);
     } else if (action === 'getDailyAll') {
       return handleGetDailyAll(params);
+    } else if (action === 'get_daily_headers') {
+      return handleGetDailyHeaders();
     } else if (action === 'qa_list') {
       return handleQAList(params);
     } else if (action === 'qa_upvote') {
@@ -246,6 +248,61 @@ function getDailySheet(ss) {
   return sheet;
 }
 
+/**
+ * Get column headers from row 1 of DailyReport sheet.
+ * Returns an array of column names. If sheet is brand new, returns HEADERS.DAILY.
+ */
+function getDailySheetHeaders(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return HEADERS.DAILY.slice();
+  var headerRow = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  // Filter out empty trailing columns
+  var headers = [];
+  for (var i = 0; i < headerRow.length; i++) {
+    var h = String(headerRow[i]).trim();
+    if (h) headers.push(h);
+  }
+  return headers.length > 0 ? headers : HEADERS.DAILY.slice();
+}
+
+/**
+ * Ensure DailyReport sheet has all columns in the provided list.
+ * New columns are appended to the right. Existing columns are NOT touched.
+ */
+function ensureDailyColumns(sheet, requiredColumns) {
+  var currentHeaders = getDailySheetHeaders(sheet);
+  var missing = [];
+  requiredColumns.forEach(function(col) {
+    if (currentHeaders.indexOf(col) === -1) {
+      missing.push(col);
+    }
+  });
+  if (missing.length > 0) {
+    var startCol = currentHeaders.length + 1;
+    var newHeaders = missing;
+    sheet.getRange(1, startCol, 1, newHeaders.length).setValues([newHeaders]);
+  }
+}
+
+/**
+ * Get DailyReport data using dynamic headers from row 1 of the sheet.
+ */
+function getDailyData(sheet) {
+  var headers = getDailySheetHeaders(sheet);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  var data = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  return data
+    .filter(function(row) { return row.some(function(cell) { return cell !== '' && cell !== null; }); })
+    .map(function(row) {
+      var obj = {};
+      headers.forEach(function(h, i) {
+        obj[h] = row[i] !== undefined ? cellToString(row[i], h) : '';
+      });
+      return obj;
+    });
+}
+
 // ============================================================
 // GET: action=getDaily&bu=X&date=Y
 // Returns daily report rows for specific BU + date
@@ -259,7 +316,7 @@ function handleGetDaily(params) {
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = getDailySheet(ss);
-  var data = getSheetData(sheet, HEADERS.DAILY);
+  var data = getDailyData(sheet);
 
   var filtered = data.filter(function(row) {
     return String(row.bu) === String(bu) && String(row.date) === String(date);
@@ -281,7 +338,7 @@ function handleGetDailyMTD(params) {
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = getDailySheet(ss);
-  var data = getSheetData(sheet, HEADERS.DAILY);
+  var data = getDailyData(sheet);
 
   var filtered = data.filter(function(row) {
     return String(row.bu) === String(bu) && String(row.date).substring(0, 7) === String(month);
@@ -302,7 +359,7 @@ function handleGetDailyAll(params) {
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = getDailySheet(ss);
-  var data = getSheetData(sheet, HEADERS.DAILY);
+  var data = getDailyData(sheet);
 
   var filtered = data.filter(function(row) {
     return String(row.date).substring(0, 7) === String(month);
@@ -328,13 +385,20 @@ function handleSaveDaily(body) {
 
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = getDailySheet(ss);
-  var headers = HEADERS.DAILY;
   var savedAt = new Date().toISOString();
+
+  // Ensure any new columns from the incoming row exist in the sheet
+  var incomingCols = Object.keys(row).filter(function(k) { return k !== 'saved_at'; });
+  incomingCols.push('saved_at'); // ensure saved_at is last if not present
+  ensureDailyColumns(sheet, incomingCols);
+
+  // Read current headers (after potential column additions)
+  var headers = getDailySheetHeaders(sheet);
 
   // Delete existing rows for this BU + date (UPSERT)
   deleteDailyMatchingRows(sheet, headers, bu, date);
 
-  // Insert new row
+  // Insert new row aligned to current headers
   var newRow = headers.map(function(h) {
     if (h === 'saved_at') return savedAt;
     var val = row[h];
@@ -358,7 +422,9 @@ function deleteDailyMatchingRows(sheet, headers, bu, date) {
   var dateIdx = headers.indexOf('date');
   if (buIdx < 0 || dateIdx < 0) return;
 
-  var data = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  // Read all columns to find bu/date
+  var numCols = sheet.getLastColumn();
+  var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
   var rowsToDelete = [];
 
   data.forEach(function(row, i) {
@@ -430,6 +496,17 @@ function handleGetConfigMonths() {
 }
 
 // ============================================================
+// GET: action=get_daily_headers
+// Returns column headers from row 1 of DailyReport sheet
+// ============================================================
+function handleGetDailyHeaders() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = getDailySheet(ss);
+  var headers = getDailySheetHeaders(sheet);
+  return makeResponse({ ok: true, headers: headers });
+}
+
+// ============================================================
 // POST: action=save_config
 // Body: { month, config: { section: { key: value, ... }, ... } }
 // ============================================================
@@ -470,6 +547,19 @@ function handleSaveConfig(body) {
   // Cập nhật BU_LIST nếu có thay đổi
   if (config.bu_list && config.bu_list.list) {
     BU_LIST = config.bu_list.list;
+  }
+
+  // Đồng bộ cột DailyReport khi lưu daily_fields config
+  if (config.daily_fields && config.daily_fields.list && Array.isArray(config.daily_fields.list)) {
+    try {
+      var dailySheet = getDailySheet(ss);
+      var fieldIds = config.daily_fields.list.map(function(f) { return f.id; });
+      var colsToEnsure = ['bu', 'date'].concat(fieldIds).concat(['saved_at']);
+      ensureDailyColumns(dailySheet, colsToEnsure);
+    } catch(syncErr) {
+      // Non-fatal: log and continue
+      Logger.log('daily_fields sync error: ' + syncErr.toString());
+    }
   }
 
   return makeResponse({ success: true, saved_at: savedAt, rows_saved: newRows.length });

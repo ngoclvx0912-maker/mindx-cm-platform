@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css?v=dr2">
+  <link rel="stylesheet" href="./style.css?v=dops1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -622,71 +622,105 @@
 
     <!-- Loading state -->
     <div id="dops-loading" style="display:none;text-align:center;padding:60px;color:#aaa;font-size:14px">
-      Đang tải dữ liệu Daily Report...
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cc0000" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+      <div style="margin-top:12px">Đang tải dữ liệu Daily Report...</div>
     </div>
 
     <!-- Empty state -->
     <div id="dops-empty" style="text-align:center;padding:60px;color:#aaa;font-size:14px">
+      <div style="font-size:40px;margin-bottom:12px">📋</div>
       Chọn tháng và nhấn Cập nhật để xem dữ liệu Daily Operations
     </div>
 
     <!-- Dashboard content (hidden until data loaded) -->
     <div id="dops-content" style="display:none">
 
-      <!-- KPI Summary Cards -->
+      <!-- KPI Summary Cards (redesigned with gradient + MoM) -->
       <div class="dops-kpi-row">
-        <div class="dops-kpi-card dops-kpi-deal">
+
+        <div class="dops-kpi-card dops-kpi-deal dops-kpi-card-v2" id="dops-kpi-deal-card">
+          <div class="dops-kpi-card-icon">🏆</div>
           <div class="dops-kpi-label">Tổng Deal MTD</div>
-          <div class="dops-kpi-value" id="dops-total-deal">0</div>
+          <div class="dops-kpi-value">—</div>
+          <div class="dops-kpi-mom"></div>
         </div>
-        <div class="dops-kpi-card dops-kpi-revenue">
+
+        <div class="dops-kpi-card dops-kpi-revenue dops-kpi-card-v2" id="dops-kpi-revenue-card">
+          <div class="dops-kpi-card-icon">💰</div>
           <div class="dops-kpi-label">Tổng Doanh số MTD</div>
-          <div class="dops-kpi-value" id="dops-total-revenue">0M</div>
+          <div class="dops-kpi-value">—</div>
+          <div class="dops-kpi-mom"></div>
         </div>
-        <div class="dops-kpi-card">
+
+        <div class="dops-kpi-card dops-kpi-card-v2" id="dops-kpi-cr16-card">
+          <div class="dops-kpi-card-icon">📊</div>
           <div class="dops-kpi-label">CR16 Blended</div>
-          <div class="dops-kpi-value" id="dops-cr16">0%</div>
+          <div class="dops-kpi-value">—</div>
           <div class="dops-kpi-bench">Benchmark: 15%</div>
+          <div class="dops-kpi-mom"></div>
         </div>
-        <div class="dops-kpi-card">
+
+        <div class="dops-kpi-card dops-kpi-card-v2" id="dops-kpi-cr46-card">
+          <div class="dops-kpi-card-icon">🎯</div>
           <div class="dops-kpi-label">CR46 Blended</div>
-          <div class="dops-kpi-value" id="dops-cr46">0%</div>
+          <div class="dops-kpi-value">—</div>
           <div class="dops-kpi-bench">Benchmark: 50%</div>
+          <div class="dops-kpi-mom"></div>
         </div>
-        <div class="dops-kpi-card">
+
+        <div class="dops-kpi-card dops-kpi-card-v2" id="dops-kpi-aov-card">
+          <div class="dops-kpi-card-icon">📈</div>
           <div class="dops-kpi-label">AOV</div>
-          <div class="dops-kpi-value" id="dops-aov">0M</div>
+          <div class="dops-kpi-value">—</div>
           <div class="dops-kpi-bench">Benchmark: 18M</div>
+          <div class="dops-kpi-mom"></div>
         </div>
-        <div class="dops-kpi-card">
+
+        <div class="dops-kpi-card dops-kpi-card-v2" id="dops-kpi-noshow-card">
+          <div class="dops-kpi-card-icon">🚫</div>
           <div class="dops-kpi-label">No-show Rate</div>
-          <div class="dops-kpi-value" id="dops-noshow">0%</div>
+          <div class="dops-kpi-value">—</div>
+          <div class="dops-kpi-mom"></div>
         </div>
-      </div>
+
+      </div><!-- /dops-kpi-row -->
 
       <!-- N1 Section -->
-      <div id="dops-section-n1" class="dops-section">
-        <div class="dops-section-header dops-header-n1">N1 — OPTIMIZE (MKT → Deal)</div>
+      <div id="dops-section-n1" class="dops-section dops-section-v2 dops-section-n1">
+        <div class="dops-section-header dops-header-n1">
+          <span class="dops-section-badge">N1</span>
+          <span>OPTIMIZE — MKT → Deal</span>
+          <span class="dops-section-sub">Tối ưu chuyển đổi từ Marketing</span>
+        </div>
         <div class="dops-metrics" id="dops-metrics-n1"></div>
         <div class="dops-cr-strip dops-cr-strip-n1" id="dops-cr-n1"></div>
       </div>
 
       <!-- N2 Section -->
-      <div id="dops-section-n2" class="dops-section">
-        <div class="dops-section-header dops-header-n2">N2 — OPS (Re/Upsell & Referral)</div>
+      <div id="dops-section-n2" class="dops-section dops-section-v2 dops-section-n2">
+        <div class="dops-section-header dops-header-n2">
+          <span class="dops-section-badge">N2</span>
+          <span>OPS — Re/Upsell &amp; Referral</span>
+          <span class="dops-section-sub">Chăm sóc khách hàng &amp; mở rộng</span>
+        </div>
         <div class="dops-metrics" id="dops-metrics-n2"></div>
         <div class="dops-cr-strip dops-cr-strip-n2" id="dops-cr-n2"></div>
       </div>
 
       <!-- N3 Section -->
-      <div id="dops-section-n3" class="dops-section">
-        <div class="dops-section-header dops-header-n3">N3 — GROWTH (Direct Sales)</div>
+      <div id="dops-section-n3" class="dops-section dops-section-v2 dops-section-n3">
+        <div class="dops-section-header dops-header-n3">
+          <span class="dops-section-badge">N3</span>
+          <span>GROWTH — Direct Sales</span>
+          <span class="dops-section-sub">Tự kiếm lead &amp; phát triển thị trường</span>
+        </div>
         <div class="dops-metrics" id="dops-metrics-n3"></div>
         <div class="dops-cr-strip dops-cr-strip-n3" id="dops-cr-n3"></div>
       </div>
 
       <!-- Report coverage -->
       <div class="dops-coverage">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;opacity:.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
         <span id="dops-coverage-text"></span>
       </div>
 
@@ -880,18 +914,78 @@
   <!-- Config Sections -->
   <div class="config-sections" id="config-sections">
 
-    <!-- Section 1: KPI List -->
+    <!-- Section 1: Daily Report Fields Editor -->
     <div class="config-section">
       <div class="config-section-header" onclick="toggleConfigSection(this)">
         <div class="config-section-title">
           <span class="config-section-icon">📊</span>
-          Danh sách chỉ số Daily Report
+          Chỉ số Daily Report (Dynamic)
         </div>
         <span class="config-section-toggle">▼</span>
       </div>
       <div class="config-section-body">
-        <p class="config-section-desc">Danh sách các chỉ số CM nhập liệu hàng ngày trong Daily Report. Mỗi dòng 1 chỉ số.</p>
-        <textarea id="cfg-kpi-list" class="config-textarea" rows="19" placeholder="Mỗi dòng là 1 chỉ số..."></textarea>
+        <p class="config-section-desc">Quản lý các chỉ số CM nhập liệu hàng ngày. Thêm / xóa / đổi tên chỉ số và nhấn <strong>Lưu Cấu hình</strong> để áp dụng. Dữ liệu cũ trong sheet không bị xóa.</p>
+
+        <div id="cfg-daily-fields-editor">
+
+          <!-- Group N1 -->
+          <div class="daily-fields-group" data-group="N1">
+            <div class="daily-fields-group-header">N1 — OPTIMIZE (MKT)</div>
+            <div class="daily-field-col-header">
+              <span style="flex:0 0 24px"></span>
+              <span style="flex:0 0 130px">ID (khóa)</span>
+              <span style="flex:1">Tên hiển thị</span>
+              <span style="flex:0 0 140px">Vai trò (Role)</span>
+              <span style="flex:0 0 32px"></span>
+            </div>
+            <div class="daily-fields-list" id="cfg-daily-n1"></div>
+            <button class="btn-add-daily-field" onclick="addDailyField('N1')">+ Thêm chỉ số N1</button>
+          </div>
+
+          <!-- Group N2 -->
+          <div class="daily-fields-group" data-group="N2">
+            <div class="daily-fields-group-header">N2 — OPS (Re/Upsell &amp; Referral)</div>
+            <div class="daily-field-col-header">
+              <span style="flex:0 0 24px"></span>
+              <span style="flex:0 0 130px">ID (khóa)</span>
+              <span style="flex:1">Tên hiển thị</span>
+              <span style="flex:0 0 140px">Vai trò (Role)</span>
+              <span style="flex:0 0 32px"></span>
+            </div>
+            <div class="daily-fields-list" id="cfg-daily-n2"></div>
+            <button class="btn-add-daily-field" onclick="addDailyField('N2')">+ Thêm chỉ số N2</button>
+          </div>
+
+          <!-- Group N3 -->
+          <div class="daily-fields-group" data-group="N3">
+            <div class="daily-fields-group-header">N3 — GROWTH (Direct Sales)</div>
+            <div class="daily-field-col-header">
+              <span style="flex:0 0 24px"></span>
+              <span style="flex:0 0 130px">ID (khóa)</span>
+              <span style="flex:1">Tên hiển thị</span>
+              <span style="flex:0 0 140px">Vai trò (Role)</span>
+              <span style="flex:0 0 32px"></span>
+            </div>
+            <div class="daily-fields-list" id="cfg-daily-n3"></div>
+            <button class="btn-add-daily-field" onclick="addDailyField('N3')">+ Thêm chỉ số N3</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 1b: KPI List (legacy) -->
+    <div class="config-section">
+      <div class="config-section-header" onclick="toggleConfigSection(this)">
+        <div class="config-section-title">
+          <span class="config-section-icon">📝</span>
+          Danh sách KPI (WR)
+        </div>
+        <span class="config-section-toggle">▼</span>
+      </div>
+      <div class="config-section-body">
+        <p class="config-section-desc">Danh sách các KPI trong Weekly Report. Mỗi dòng 1 chỉ số.</p>
+        <textarea id="cfg-kpi-list" class="config-textarea" rows="10" placeholder="Mỗi dòng là 1 chỉ số..."></textarea>
       </div>
     </div>
 
@@ -1328,6 +1422,6 @@
   </div>
 </div>
 
-<script src="./app.js?v=dr2"></script>
+<script src="./app.js?v=dops1"></script>
 </body>
 </html>
