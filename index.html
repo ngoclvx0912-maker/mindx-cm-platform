@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindX – CM Report Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- ======= HEADER ======= -->
+<header id="app-header">
+  <div class="header-logo" onclick="navigate('landing')" title="Trang chủ">
+    <div class="header-logo-mark">MX</div>
+    <div>
+      <div class="header-title">MindX Technology School</div>
+      <div class="header-subtitle">CM Report Platform</div>
+    </div>
+  </div>
+  <div class="header-spacer"></div>
+  <nav class="header-nav">
+    <button class="header-nav-btn" data-nav="landing" onclick="navigate('landing')">Trang chủ</button>
+    <button class="header-nav-btn" data-nav="cm" onclick="navigate('cm')">CM Báo cáo</button>
+
+    <button class="header-nav-btn" data-nav="dashboard" onclick="navigate('dashboard')">FM/SOD Dashboard</button>
+    <button class="header-nav-btn" data-nav="training" onclick="navigate('training')">CM Training</button>
+    <button class="header-nav-btn header-nav-config" data-nav="config" onclick="navigate('config')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Cấu hình
+    </button>
+  </nav>
+</header>
+
+<!-- ======= TOAST ======= -->
+<div id="toast-container"></div>
+
+<!-- ======= PANEL OVERLAY ======= -->
+<div id="panel-overlay"></div>
+
+<!-- ===================== LANDING VIEW ===================== -->
+<div id="view-landing" class="view active">
+  <div class="landing-header">
+    <h1>MindX <span>CM Report</span> Platform</h1>
+    <p>Hệ thống quản lý báo cáo nội bộ — Center Manager &amp; FM/SOD</p>
+  </div>
+  <div class="landing-cards">
+    <div class="landing-card" onclick="navigate('cm')">
+      <div class="landing-card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </div>
+      <h2>CM Điền Báo Cáo</h2>
+      <p>Nhập dữ liệu Action Plan theo BU / tháng / tuần</p>
+      <div class="landing-card-arrow">→</div>
+    </div>
+
+    <div class="landing-card" onclick="navigate('dashboard')">
+      <div class="landing-card-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+        </svg>
+      </div>
+      <h2>FM/SOD Xem Dashboard</h2>
+      <p>Theo dõi tiến độ Action Plan và Daily Report của tất cả 46 BU</p>
+      <div class="landing-card-arrow">→</div>
+    </div>
+    <div class="landing-card landing-card-training" onclick="navigate('training')">
+      <div class="landing-card-icon training-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+          <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+        </svg>
+      </div>
+      <h2>CM Training</h2>
+      <p>Đánh giá năng lực CM qua 5 tiêu chí hành vi thực tế trên platform</p>
+      <div class="landing-card-arrow">→</div>
+    </div>
+    <div class="landing-card landing-card-config" onclick="navigate('config')">
+      <div class="landing-card-icon config-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+      <h2>Cấu hình KPI & Target</h2>
+      <p>Cấu hình các chỉ số KPI, benchmark, ngưỡng xếp loại và danh sách BU theo từng tháng</p>
+      <div class="landing-card-arrow">→</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CM VIEW ===================== -->
+<div id="view-cm" class="view">
+
+  <!-- Tabs (đặt trên cùng, giống Daily Report) -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" data-tab="AP">Action Plan</button>
+    <button class="tab-btn tab-btn-link" onclick="navigateFromCM('daily')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Daily Report
+    </button>
+    <button class="tab-btn tab-btn-link" onclick="navigateFromCM('discussion')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Thảo luận
+    </button>
+    <button class="tab-btn" data-tab="CM-ANA">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Analytical
+    </button>
+    <!-- WR tab ẩn -->
+    <button class="tab-btn" data-tab="WR" style="display:none">Weekly Report</button>
+  </div>
+
+  <!-- Topbar -->
+  <div class="view-topbar">
+    <span class="topbar-label">BU</span>
+    <select id="cm-bu" class="topbar-select" style="min-width:160px">
+      <option value="">— Chọn BU —</option>
+    </select>
+
+    <div class="topbar-divider"></div>
+
+    <!-- Auto-detected period display -->
+    <div class="period-display" id="cm-period-display">
+      <div class="period-item" style="display:none">
+        <span class="period-label">Weekly Report</span>
+        <span class="period-value" id="cm-wr-period">—</span>
+      </div>
+      <div class="period-sep" style="display:none">|</div>
+      <div class="period-item">
+        <span class="period-label">Action Plan</span>
+        <span class="period-value" id="cm-ap-period">—</span>
+      </div>
+    </div>
+
+    <div class="topbar-divider"></div>
+
+    <!-- Lock status badge -->
+    <div id="cm-lock-status" class="lock-status">
+      <span class="lock-icon">🔓</span>
+      <span class="lock-text" id="cm-lock-text">—</span>
+    </div>
+
+  </div>
+
+  <!-- FM Note Section (hiển thị cho CM) -->
+  <div id="cm-fm-note-section" style="display:none">
+    <div class="fm-note-card">
+      <div class="fm-note-card-header">
+        <span class="fm-note-icon">📝</span>
+        <span class="fm-note-title">Ghi chú từ FM</span>
+      </div>
+      <div id="cm-fm-note-thread-container"></div>
+    </div>
+  </div>
+
+  <!-- Diagnostic Coach Banner -->
+  <div id="diagnostic-section" style="display:none">
+    <div class="diagnostic-banner">
+      <div class="diagnostic-banner-left">
+        <div class="diagnostic-banner-icon">🔍</div>
+        <div>
+          <div class="diagnostic-banner-title">AI Diagnostic Coach</div>
+          <div class="diagnostic-banner-desc">Phân tích dữ liệu để nhận diện vấn đề gốc, nguyên nhân gốc rễ, và gợi ý key actions trước khi lập Action Plan</div>
+        </div>
+      </div>
+      <button id="btn-diagnostic" class="btn-diagnostic" onclick="runDiagnostic()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Chẩn đoán BU
+      </button>
+    </div>
+
+    <!-- Diagnostic Result -->
+    <div id="diagnostic-result" style="display:none"></div>
+  </div>
+
+  <!-- ===== ACTION PLAN TAB ===== -->
+  <div id="tab-AP" class="tab-content active">
+    <div class="table-actions">
+      <button class="btn btn-secondary btn-sm" onclick="addAPRow()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Thêm dòng
+      </button>
+      <span style="font-size:11px;color:#888">Bảng có thể cuộn ngang — drag để xem tất cả cột</span>
+    </div>
+
+    <div class="form-table-wrapper">
+      <table class="form-table ap-table">
+        <colgroup>
+          <col style="width:34px">
+          <col style="width:100px">
+          <col style="width:140px">
+          <col style="width:200px">
+          <col style="width:110px">
+          <col style="width:200px">
+          <col style="width:200px">
+          <col style="width:200px">
+          <col style="width:130px">
+          <col style="width:110px">
+          <col style="width:120px">
+          <col style="width:130px">
+          <col style="width:120px">
+          <col style="width:34px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Function</th>
+            <th>Chỉ số liên quan</th>
+            <th>Vấn đề / Tín hiệu<br><small style="font-weight:400;font-size:10px">Nhận diện từ WR</small></th>
+            <th>Mức độ<br><small style="font-weight:400;font-size:10px">Đánh giá</small></th>
+            <th>Root Cause<br><small style="font-weight:400;font-size:10px">Nguyên nhân gốc rễ</small></th>
+            <th>Key Action<br><small style="font-weight:400;font-size:10px">Hành động chính</small></th>
+            <th>Mô tả triển khai<br><small style="font-weight:400;font-size:10px">Các bước cụ thể</small></th>
+            <th>Target đo lường<br><small style="font-weight:400;font-size:10px">Kết quả mong đợi</small></th>
+            <th>Deadline</th>
+            <th>Owner<br><small style="font-weight:400;font-size:10px">Người phụ trách</small></th>
+            <th>FM Support<br><small style="font-weight:400;font-size:10px">Hỗ trợ từ FM</small></th>
+            <th>Status<br><small style="font-weight:400;font-size:10px">Trạng thái</small></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ap-tbody">
+          <!-- Rendered by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="save-bar">
+      <button class="btn btn-primary" onclick="saveTab('AP')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Lưu Action Plan
+      </button>
+      <span id="saved-indicator-AP" class="saved-indicator">Chưa lưu</span>
+    </div>
+  </div>
+
+  <!-- ===== WEEKLY REPORT TAB ===== -->
+  <div id="tab-WR" class="tab-content">
+    <div class="table-actions">
+      <span style="font-size:11px;color:#888">Gap và % Đạt được tự động tính khi nhập Target và Actual</span>
+    </div>
+
+    <div class="form-table-wrapper">
+      <table class="form-table" style="min-width:800px">
+        <colgroup>
+          <col style="width:36px">
+          <col style="width:270px">
+          <col style="width:90px">
+          <col style="width:90px">
+          <col style="width:80px">
+          <col style="width:90px">
+          <col style="width:250px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>KPI</th>
+            <th>Target</th>
+            <th>Actual</th>
+            <th class="col-red">Gap</th>
+            <th class="col-red">% Đạt</th>
+            <th>Trạng thái / Ghi chú</th>
+          </tr>
+        </thead>
+        <tbody id="wr-tbody">
+          <!-- Rendered by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="save-bar">
+      <button class="btn btn-primary" onclick="saveTab('WR')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Lưu Weekly Report
+      </button>
+      <span id="saved-indicator-WR" class="saved-indicator">Chưa lưu</span>
+    </div>
+  </div>
+
+  <!-- ===== ANALYTICAL TAB (CM) ===== -->
+  <div id="tab-CM-ANA" class="tab-content">
+    <!-- Placeholder khi chưa chọn BU -->
+    <div id="cm-ana-no-bu" style="text-align:center;padding:80px 20px;color:var(--gray-400);font-size:15px">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block;margin:0 auto 12px;opacity:.4"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Hãy chọn BU của mình để xem phân tích
+    </div>
+
+    <!-- Nội dung phân tích (ẩn cho đến khi chọn BU) -->
+    <div id="cm-ana-wrapper" style="display:none">
+
+      <!-- Filter bar -->
+      <div class="dops-controls">
+        <div class="dops-filter-group">
+          <span class="dops-filter-label">Tháng</span>
+          <select id="cm-ana-month" class="topbar-select" onchange="loadCMAnalytics()"></select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="loadCMAnalytics()" style="margin-left:8px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+          Cập nhật
+        </button>
+        <div class="header-spacer"></div>
+        <span id="cm-ana-meta" class="dops-meta"></span>
+      </div>
+
+      <!-- Loading -->
+      <div id="cm-ana-loading" style="display:none;text-align:center;padding:60px;color:#aaa;font-size:14px">
+        Đang tải dữ liệu phân tích...
+      </div>
+      <!-- Empty -->
+      <div id="cm-ana-empty" style="display:none;text-align:center;padding:60px;color:#aaa;font-size:14px">
+        Chưa có dữ liệu Daily Report cho BU này
+      </div>
+
+      <!-- Analytics content -->
+      <div id="cm-ana-content" style="display:none">
+
+        <!-- SECTION 1: WORK METRICS SCORECARD -->
+        <div class="ana-panel">
+          <div class="ana-panel-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Chỉ số công việc (Leading Indicators)
+          </div>
+          <div class="ana-section-desc">Đo lường mức độ "chăm chỉ" — các hoạt động đầu vào quyết định kết quả đầu ra</div>
+          <div id="cm-ana-work-metrics"></div>
+        </div>
+
+        <!-- SECTION 2: CONVERSION FUNNEL -->
+        <div class="ana-panel">
+          <div class="ana-panel-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L2 10l7 3 3 7z"/></svg>
+            Hiệu quả chuyển đổi (Conversion Efficiency)
+          </div>
+          <div class="ana-section-desc">Làm việc "thông minh" — chất lượng chuyển đổi ở từng bước</div>
+          <div id="cm-ana-conversion"></div>
+        </div>
+
+        <!-- SECTION 3: DIAGNOSTIC -->
+        <div class="ana-panel">
+          <div class="ana-panel-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            Chẩn đoán BU
+          </div>
+          <div class="ana-section-desc">Đánh giá tổng thể: Chăm chỉ + Hiệu quả? Chăm chỉ nhưng chưa hiệu quả? Hay cần nỗ lực hơn?</div>
+          <div id="cm-ana-diagnostic"></div>
+        </div>
+
+        <!-- SECTION 4: EOM FORECAST -->
+        <div class="ana-panel">
+          <div class="ana-panel-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+            Dự báo cuối tháng (Work-Based Forecast)
+          </div>
+          <div class="ana-section-desc">Dự đoán khả năng về đích dựa trên nhịp làm việc hiện tại</div>
+          <div id="cm-ana-forecast"></div>
+        </div>
+
+        <!-- SECTION 5: TOP BU REFERENCE -->
+        <div class="ana-panel">
+          <div class="ana-panel-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Top BU tham khảo
+          </div>
+          <div class="ana-section-desc">So sánh BU của bạn với những BU có chỉ số tốt nhất hệ thống</div>
+          <div id="cm-ana-top-bu"></div>
+        </div>
+
+        <!-- SECTION 6: MiMi AI -->
+        <div class="ana-panel ana-mimi-panel">
+          <div class="ana-panel-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            MiMi AI — Phân tích sâu
+          </div>
+          <div class="ana-mimi-body">
+            <div class="ana-mimi-prompt">
+              MiMi sẽ phân tích chỉ số công việc của BU bạn, so sánh với benchmark và đưa ra gợi ý cải thiện cụ thể.
+            </div>
+            <div id="cm-ana-mimi-context" style="display:none"></div>
+            <button id="cm-ana-mimi-btn" class="btn btn-primary" onclick="askCMMiMiAnalytics()" style="margin-top:12px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Hỏi MiMi phân tích sâu
+            </button>
+            <div id="cm-ana-mimi-response" style="display:none"></div>
+          </div>
+        </div>
+
+      </div><!-- /cm-ana-content -->
+
+    </div><!-- /cm-ana-wrapper -->
+  </div><!-- /tab-CM-ANA -->
+
+</div><!-- /view-cm -->
+
+<!-- ===================== DASHBOARD VIEW ===================== -->
+<div id="view-dashboard" class="view">
+
+  <!-- Dashboard Tabs -->
+  <div class="dash-tabs">
+    <button class="dash-tab active" data-dtab="scoring" onclick="switchDashTab('scoring')">Tiến độ báo cáo</button>
+    <button class="dash-tab" data-dtab="daily-ops" onclick="switchDashTab('daily-ops')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Daily Operations
+    </button>
+    <button class="dash-tab" data-dtab="analytics" onclick="switchDashTab('analytics')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Analytical
+    </button>
+  </div>
+
+  <!-- ===== TAB: SCORING (existing) ===== -->
+  <div id="dtab-scoring" class="dash-tab-content active">
+
+  <!-- Controls -->
+  <div class="dash-controls">
+    <!-- Auto-detected period display -->
+    <div class="period-display" id="dash-period-display">
+      <div class="period-item">
+        <span class="period-label">Kỳ báo cáo</span>
+        <span class="period-value" id="dash-current-period">—</span>
+      </div>
+    </div>
+
+    <div class="topbar-divider"></div>
+
+    <span class="topbar-label">Xem kỳ khác</span>
+    <select id="dash-period-history" class="topbar-select" style="min-width:200px" onchange="onDashPeriodChange()">
+      <!-- Populated by JS -->
+    </select>
+
+    <button id="btn-analyze" class="btn btn-primary" onclick="runAnalysis()" style="margin-left:4px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+      Cập nhật
+    </button>
+
+    <div class="header-spacer"></div>
+
+    <button class="btn btn-secondary btn-sm" onclick="exportCSV()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Xuất CSV
+    </button>
+  </div>
+
+  <!-- Function Toggle (FM view) -->
+  <div class="func-toggle">
+    <div class="func-toggle-label">Xem theo Function:</div>
+    <div class="func-toggle-btns">
+      <button class="func-btn active" data-func="ALL" onclick="setFuncFilter('ALL')">Tất cả</button>
+      <button class="func-btn" data-func="GROWTH" onclick="setFuncFilter('GROWTH')">FM Growth</button>
+      <button class="func-btn" data-func="OPTIMIZE" onclick="setFuncFilter('OPTIMIZE')">FM Optimize</button>
+      <button class="func-btn" data-func="OPS" onclick="setFuncFilter('OPS')">FM Ops</button>
+    </div>
+  </div>
+
+
+
+  <!-- Summary Cards -->
+  <div class="summary-cards">
+    <div class="summary-card total">
+      <div class="summary-card-val" id="card-total">46</div>
+      <div class="summary-card-label">Tổng BU</div>
+    </div>
+    <div class="summary-card card-xanh">
+      <div class="summary-card-val" id="card-ap-done">0</div>
+      <div class="summary-card-label">Đã làm AP</div>
+    </div>
+    <div class="summary-card card-do">
+      <div class="summary-card-val" id="card-ap-missing">0</div>
+      <div class="summary-card-label">Chưa làm AP</div>
+    </div>
+    <div class="summary-card card-daily-ok">
+      <div class="summary-card-val" id="card-daily-ok">0</div>
+      <div class="summary-card-label">Daily đầy đủ</div>
+    </div>
+    <div class="summary-card card-daily-gap">
+      <div class="summary-card-val" id="card-daily-gap">0</div>
+      <div class="summary-card-label">Thiếu Daily</div>
+    </div>
+  </div>
+
+  <!-- Compliance Overview -->
+  <div class="quality-section">
+    <div class="section-title">Tổng quan tiến độ báo cáo</div>
+    <div class="compliance-bars">
+      <div class="compliance-row">
+        <span class="compliance-label">Action Plan</span>
+        <div class="compliance-track">
+          <div class="compliance-fill compliance-fill-ap" id="cbar-ap" style="width:0%"></div>
+        </div>
+        <span class="compliance-pct" id="cbar-ap-pct">0%</span>
+      </div>
+      <div class="compliance-row">
+        <span class="compliance-label">Daily Report</span>
+        <div class="compliance-track">
+          <div class="compliance-fill compliance-fill-daily" id="cbar-daily" style="width:0%"></div>
+        </div>
+        <span class="compliance-pct" id="cbar-daily-pct">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MTD Run Rate Overview -->
+  <div class="quality-section" id="mtd-runrate-section" style="display:none">
+    <div class="section-title">Doanh số MTD toàn hệ thống <span id="mtd-pace-label" style="font-weight:400;font-size:12px;color:var(--gray-400)"></span></div>
+    <div class="compliance-bars">
+      <div class="compliance-row">
+        <span class="compliance-label">Tổng</span>
+        <div class="compliance-track">
+          <div class="compliance-fill" id="rr-bar-total" style="width:0%;background:var(--black)"></div>
+          <div class="compliance-pace-mark" id="rr-pace-total"></div>
+        </div>
+        <span class="compliance-pct" id="rr-pct-total"></span>
+      </div>
+      <div class="compliance-row">
+        <span class="compliance-label">N1 Optimize</span>
+        <div class="compliance-track">
+          <div class="compliance-fill" id="rr-bar-n1" style="width:0%;background:var(--red)"></div>
+          <div class="compliance-pace-mark" id="rr-pace-n1"></div>
+        </div>
+        <span class="compliance-pct" id="rr-pct-n1"></span>
+      </div>
+      <div class="compliance-row">
+        <span class="compliance-label">N2 Ops</span>
+        <div class="compliance-track">
+          <div class="compliance-fill" id="rr-bar-n2" style="width:0%;background:var(--blue)"></div>
+          <div class="compliance-pace-mark" id="rr-pace-n2"></div>
+        </div>
+        <span class="compliance-pct" id="rr-pct-n2"></span>
+      </div>
+      <div class="compliance-row">
+        <span class="compliance-label">N3 Growth</span>
+        <div class="compliance-track">
+          <div class="compliance-fill" id="rr-bar-n3" style="width:0%;background:var(--green)"></div>
+          <div class="compliance-pace-mark" id="rr-pace-n3"></div>
+        </div>
+        <span class="compliance-pct" id="rr-pct-n3"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="dash-filters">
+    <input type="text" id="filter-search" placeholder="🔍 Tìm BU..." style="width:200px">
+    <select id="filter-rating">
+      <option value="">Tất cả trạng thái</option>
+      <option value="ap-done">Đã làm AP</option>
+      <option value="ap-missing">Chưa làm AP</option>
+      <option value="daily-ok">Daily đầy đủ</option>
+      <option value="daily-gap">Thiếu Daily</option>
+    </select>
+    <select id="filter-region">
+      <option value="">Tất cả vùng</option>
+      <option value="HCM">HCM</option>
+      <option value="HN">HN</option>
+      <option value="MB">MB</option>
+      <option value="MN">MN</option>
+      <option value="MT">MT</option>
+      <option value="K18">K18</option>
+      <option value="ONL">ONL</option>
+    </select>
+    <span id="filter-count" style="font-size:11px;color:#888;margin-left:4px"></span>
+  </div>
+
+  <!-- Score Table -->
+  <div class="data-table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th data-sort="idx" onclick="sortTable('idx')">#</th>
+          <th data-sort="bu" onclick="sortTable('bu')">BU</th>
+          <th data-sort="region" onclick="sortTable('region')">Vùng</th>
+          <th data-sort="hasAP" onclick="sortTable('hasAP')">Action Plan</th>
+          <th data-sort="dailyMissing" onclick="sortTable('dailyMissing')">Daily Report<br><small style="font-weight:400;opacity:0.7">Ngày thiếu</small></th>
+          <th data-sort="runRateDiff" onclick="sortTable('runRateDiff')">Doanh số MTD<br><small style="font-weight:400;opacity:0.7">Run Rate</small></th>
+          <th title="FM Note">📝</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="score-tbody">
+        <tr>
+          <td colspan="8" style="text-align:center;padding:48px;color:#aaa;font-size:13px">
+            Đang tải dữ liệu kỳ báo cáo hiện tại...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+
+
+  </div><!-- /dtab-scoring -->
+
+  <!-- ===== TAB: DAILY OPERATIONS ===== -->
+  <div id="dtab-daily-ops" class="dash-tab-content">
+
+    <!-- Filter Bar -->
+    <div class="dops-controls">
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">Tháng</span>
+        <select id="dops-month" class="topbar-select" onchange="loadDailyOps()">
+        </select>
+      </div>
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">Nguồn</span>
+        <select id="dops-source" class="topbar-select" onchange="renderDailyOps()">
+          <option value="ALL">Tất cả nguồn</option>
+          <option value="N1">N1 — Optimize</option>
+          <option value="N2">N2 — Ops</option>
+          <option value="N3">N3 — Growth</option>
+        </select>
+      </div>
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">BU</span>
+        <select id="dops-bu" class="topbar-select" onchange="renderDailyOps()">
+          <option value="ALL">Tất cả BU</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="loadDailyOps()" style="margin-left:8px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        Cập nhật
+      </button>
+      <div class="header-spacer"></div>
+      <span id="dops-meta" class="dops-meta"></span>
+    </div>
+
+    <!-- Loading state -->
+    <div id="dops-loading" style="display:none;text-align:center;padding:60px;color:#aaa;font-size:14px">
+      Đang tải dữ liệu Daily Report...
+    </div>
+
+    <!-- Empty state -->
+    <div id="dops-empty" style="text-align:center;padding:60px;color:#aaa;font-size:14px">
+      Chọn tháng và nhấn Cập nhật để xem dữ liệu Daily Operations
+    </div>
+
+    <!-- Dashboard content (hidden until data loaded) -->
+    <div id="dops-content" style="display:none">
+
+      <!-- KPI Summary Cards -->
+      <div class="dops-kpi-row">
+        <div class="dops-kpi-card dops-kpi-deal">
+          <div class="dops-kpi-label">Tổng Deal MTD</div>
+          <div class="dops-kpi-value" id="dops-total-deal">0</div>
+        </div>
+        <div class="dops-kpi-card dops-kpi-revenue">
+          <div class="dops-kpi-label">Tổng Doanh số MTD</div>
+          <div class="dops-kpi-value" id="dops-total-revenue">0M</div>
+        </div>
+        <div class="dops-kpi-card">
+          <div class="dops-kpi-label">CR16 Blended</div>
+          <div class="dops-kpi-value" id="dops-cr16">0%</div>
+          <div class="dops-kpi-bench">Benchmark: 15%</div>
+        </div>
+        <div class="dops-kpi-card">
+          <div class="dops-kpi-label">CR46 Blended</div>
+          <div class="dops-kpi-value" id="dops-cr46">0%</div>
+          <div class="dops-kpi-bench">Benchmark: 50%</div>
+        </div>
+        <div class="dops-kpi-card">
+          <div class="dops-kpi-label">AOV</div>
+          <div class="dops-kpi-value" id="dops-aov">0M</div>
+          <div class="dops-kpi-bench">Benchmark: 18M</div>
+        </div>
+        <div class="dops-kpi-card">
+          <div class="dops-kpi-label">No-show Rate</div>
+          <div class="dops-kpi-value" id="dops-noshow">0%</div>
+        </div>
+      </div>
+
+      <!-- N1 Section -->
+      <div id="dops-section-n1" class="dops-section">
+        <div class="dops-section-header dops-header-n1">N1 — OPTIMIZE (MKT → Deal)</div>
+        <div class="dops-metrics" id="dops-metrics-n1"></div>
+        <div class="dops-cr-strip dops-cr-strip-n1" id="dops-cr-n1"></div>
+      </div>
+
+      <!-- N2 Section -->
+      <div id="dops-section-n2" class="dops-section">
+        <div class="dops-section-header dops-header-n2">N2 — OPS (Re/Upsell & Referral)</div>
+        <div class="dops-metrics" id="dops-metrics-n2"></div>
+        <div class="dops-cr-strip dops-cr-strip-n2" id="dops-cr-n2"></div>
+      </div>
+
+      <!-- N3 Section -->
+      <div id="dops-section-n3" class="dops-section">
+        <div class="dops-section-header dops-header-n3">N3 — GROWTH (Direct Sales)</div>
+        <div class="dops-metrics" id="dops-metrics-n3"></div>
+        <div class="dops-cr-strip dops-cr-strip-n3" id="dops-cr-n3"></div>
+      </div>
+
+      <!-- Report coverage -->
+      <div class="dops-coverage">
+        <span id="dops-coverage-text"></span>
+      </div>
+
+    </div><!-- /dops-content -->
+
+  </div><!-- /dtab-daily-ops -->
+
+  <!-- ===== TAB: ANALYTICAL ===== -->
+  <div id="dtab-analytics" class="dash-tab-content">
+
+    <!-- Filter bar -->
+    <div class="dops-controls">
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">Tháng</span>
+        <select id="ana-month" class="topbar-select" onchange="loadAnalytics()"></select>
+      </div>
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">BU</span>
+        <div id="ana-bu-multi" class="ana-multi-select">
+          <button type="button" class="ana-multi-btn" onclick="toggleAnaBUDropdown()">
+            <span id="ana-bu-label">Tất cả BU</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div id="ana-bu-dropdown" class="ana-multi-dropdown" style="display:none">
+            <div class="ana-multi-shortcuts" id="ana-bu-shortcuts"></div>
+            <div class="ana-multi-divider"></div>
+            <div class="ana-multi-list" id="ana-bu-list"></div>
+            <div class="ana-multi-footer">
+              <button class="btn btn-sm" onclick="anaBUSelectAll()">Chọn tất cả</button>
+              <button class="btn btn-sm" onclick="anaBUClearAll()">Bỏ chọn</button>
+              <button class="btn btn-primary btn-sm" onclick="anaBUApply()">Áp dụng</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="loadAnalytics()" style="margin-left:8px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        Cập nhật
+      </button>
+      <div class="header-spacer"></div>
+      <span id="ana-meta" class="dops-meta"></span>
+    </div>
+
+    <!-- Loading -->
+    <div id="ana-loading" style="display:none;text-align:center;padding:60px;color:#aaa;font-size:14px">
+      Đang tải dữ liệu phân tích...
+    </div>
+    <!-- Empty -->
+    <div id="ana-empty" style="text-align:center;padding:60px;color:#aaa;font-size:14px">
+      Chọn tháng và nhấn Cập nhật để xem phân tích
+    </div>
+
+    <!-- Analytics content -->
+    <div id="ana-content" style="display:none">
+
+      <!-- SECTION 1: WORK METRICS SCORECARD -->
+      <div class="ana-panel">
+        <div class="ana-panel-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Chỉ số công việc (Leading Indicators)
+        </div>
+        <div class="ana-section-desc">Đo lường mức độ "chăm chỉ" — các hoạt động đầu vào quyết định kết quả đầu ra</div>
+        <div id="ana-work-metrics"></div>
+        <div id="ana-wm-compare" class="ana-compare-section" style="display:none">
+          <div class="ana-compare-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-4"/></svg>
+            So sánh chỉ số công việc giữa các BU
+          </div>
+          <div id="ana-wm-compare-body"></div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: CONVERSION FUNNEL -->
+      <div class="ana-panel">
+        <div class="ana-panel-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L2 10l7 3 3 7z"/></svg>
+          Hiệu quả chuyển đổi (Conversion Efficiency)
+        </div>
+        <div class="ana-section-desc">Làm việc "thông minh" — chất lượng chuyển đổi ở từng bước</div>
+        <div id="ana-conversion"></div>
+        <div id="ana-conv-compare" class="ana-compare-section" style="display:none">
+          <div class="ana-compare-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L2 10l7 3 3 7z"/></svg>
+            So sánh CR giữa các BU
+          </div>
+          <div id="ana-conv-compare-body"></div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: DIAGNOSTIC —  Chăm chỉ vs Thông minh matrix -->
+      <div class="ana-panel">
+        <div class="ana-panel-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Chẩn đoán hệ thống
+        </div>
+        <div class="ana-section-desc">Phân loại: Chăm chỉ + Kết quả tốt ✓ | Chăm chỉ nhưng kết quả thấp → Cần làm thông minh hơn | Chưa đủ nỗ lực → Cần tăng cường</div>
+        <div id="ana-diagnostic"></div>
+      </div>
+
+      <!-- SECTION 4: EOM FORECAST based on work metrics -->
+      <div class="ana-panel">
+        <div class="ana-panel-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+          Dự báo cuối tháng (Work-Based Forecast)
+        </div>
+        <div class="ana-section-desc">Dự đoán khả năng về đích dựa trên nhịp làm việc hiện tại</div>
+        <div id="ana-forecast-v2"></div>
+        <div id="ana-fc-compare" class="ana-compare-section" style="display:none">
+          <div class="ana-compare-header">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+            Dự báo theo từng BU
+          </div>
+          <div id="ana-fc-compare-body"></div>
+        </div>
+      </div>
+
+      <!-- SECTION 5: TOP BU REFERENCE -->
+      <div class="ana-panel">
+        <div class="ana-panel-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Top BU tham khảo
+        </div>
+        <div class="ana-section-desc">BU có chỉ số công việc tốt nhất — học hỏi từ người giỏi nhất</div>
+        <div id="ana-top-bu"></div>
+      </div>
+
+      <!-- SECTION 6: MiMi AI DEEP ANALYSIS -->
+      <div class="ana-panel ana-mimi-panel">
+        <div class="ana-panel-header">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          MiMi AI — Phân tích sâu
+        </div>
+        <div class="ana-mimi-body">
+          <div class="ana-mimi-prompt">
+            Khi các chỉ số công việc đã tốt nhưng kết quả chưa đạt, cần chiến lược thông minh hơn.
+            MiMi sẽ nghiên cứu thị trường EdTech và đưa gợi ý phù hợp với bối cảnh cụ thể.
+          </div>
+          <div id="ana-mimi-context" style="display:none"></div>
+          <button id="ana-mimi-btn" class="btn btn-primary" onclick="askMiMiAnalytics()" style="margin-top:12px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Hỏi MiMi phân tích sâu
+          </button>
+          <div id="ana-mimi-response" style="display:none"></div>
+        </div>
+      </div>
+
+    </div><!-- /ana-content -->
+
+  </div><!-- /dtab-analytics -->
+
+</div><!-- /view-dashboard -->
+
+<!-- ===================== TRAINING VIEW ===================== -->
+<div id="view-training" class="view">
+  <div class="dash-controls training-controls">
+    <div class="training-view-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#1a5276">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+      </svg>
+      CM Training Dashboard
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="period-display" id="training-period-display">
+      <div class="period-item">
+        <span class="period-label">Đánh giá tháng</span>
+        <span class="period-value" id="training-current-period">—</span>
+      </div>
+    </div>
+    <div class="topbar-divider"></div>
+    <span class="topbar-label">Chọn tháng</span>
+    <select id="training-period-history" class="topbar-select" style="min-width:160px" onchange="onTrainingPeriodChange()">
+    </select>
+    <button id="btn-training-analyze" class="btn btn-training-primary" onclick="runTrainingAnalysis()" style="margin-left:4px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+      Cập nhật
+    </button>
+  </div>
+  <div id="training-summary-cards" class="training-summary-cards">
+    <div class="training-summary-placeholder">
+      <div style="text-align:center;padding:32px;color:#aaa;font-size:13px">Nhấn <strong>Cập nhật</strong> để phân tích dữ liệu CM Training</div>
+    </div>
+  </div>
+  <div class="dash-filters">
+    <input type="text" id="training-filter-search" placeholder="🔍 Tìm BU..." style="width:200px" oninput="applyTrainingFilters()">
+    <select id="training-filter-region" onchange="applyTrainingFilters()">
+      <option value="">Tất cả vùng</option>
+      <option value="HCM">HCM</option><option value="HN">HN</option><option value="MB">MB</option>
+      <option value="MN">MN</option><option value="MT">MT</option><option value="K18">K18</option><option value="ONL">ONL</option>
+    </select>
+    <select id="training-filter-eval" onchange="applyTrainingFilters()">
+      <option value="">Tất cả đánh giá</option>
+      <option value="xuat-sac">Xuất sắc</option><option value="kha">Khá</option>
+      <option value="trung-binh">Trung bình</option><option value="can-phat-trien">Cần phát triển</option>
+    </select>
+    <span id="training-filter-count" style="font-size:11px;color:#888;margin-left:4px"></span>
+  </div>
+  <div class="data-table-wrapper">
+    <table class="data-table training-table">
+      <thead>
+        <tr>
+          <th data-sort="idx" onclick="sortTrainingTable('idx')">#</th>
+          <th data-sort="bu" onclick="sortTrainingTable('bu')">BU</th>
+          <th data-sort="region" onclick="sortTrainingTable('region')">Vùng</th>
+          <th data-sort="dataAnalysis" onclick="sortTrainingTable('dataAnalysis')">🔍 Phân tích<br><small style="font-weight:400;opacity:0.8">30%</small></th>
+          <th data-sort="solutionDesign" onclick="sortTrainingTable('solutionDesign')">💡 Giải pháp<br><small style="font-weight:400;opacity:0.8">30%</small></th>
+          <th data-sort="execution" onclick="sortTrainingTable('execution')">⚡ Thực thi<br><small style="font-weight:400;opacity:0.8">30%</small></th>
+          <th data-sort="discipline" onclick="sortTrainingTable('discipline')">📋 Kỷ luật<br><small style="font-weight:400;opacity:0.8">10%</small></th>
+          <th data-sort="total" onclick="sortTrainingTable('total')">Tổng<br><small style="font-weight:400;opacity:0.8">/100</small></th>
+          <th data-sort="evalCls" onclick="sortTrainingTable('evalCls')">Đánh giá</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="training-tbody">
+        <tr><td colspan="9" style="text-align:center;padding:48px;color:#aaa;font-size:13px">Nhấn <strong>Cập nhật</strong> để phân tích năng lực CM</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div><!-- /view-training -->
+
+<!-- ===================== CONFIG VIEW ===================== -->
+<div id="view-config" class="view">
+
+  <!-- Controls -->
+  <div class="dash-controls config-controls">
+    <div class="config-view-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:#cc0000">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      Cấu hình KPI &amp; Target
+    </div>
+
+    <div class="topbar-divider"></div>
+
+    <span class="topbar-label">Tháng</span>
+    <select id="config-month" class="topbar-select" style="min-width:140px" onchange="onConfigMonthChange()">
+      <!-- Populated by JS -->
+    </select>
+
+    <button class="btn btn-secondary btn-sm" onclick="copyConfigFromPrev()" id="btn-config-copy" title="Sao chép từ tháng trước">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy từ tháng trước
+    </button>
+
+    <div class="header-spacer"></div>
+
+    <div id="config-role-badge" class="config-role-badge"></div>
+
+    <button class="btn btn-primary" onclick="saveAllConfig()" id="btn-config-save">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Lưu Cấu hình
+    </button>
+    <span id="config-save-status" class="saved-indicator"></span>
+  </div>
+
+  <!-- Config Sections -->
+  <div class="config-sections" id="config-sections">
+
+    <!-- Section 1: KPI List -->
+    <div class="config-section">
+      <div class="config-section-header" onclick="toggleConfigSection(this)">
+        <div class="config-section-title">
+          <span class="config-section-icon">📊</span>
+          Danh sách chỉ số Daily Report
+        </div>
+        <span class="config-section-toggle">▼</span>
+      </div>
+      <div class="config-section-body">
+        <p class="config-section-desc">Danh sách các chỉ số CM nhập liệu hàng ngày trong Daily Report. Mỗi dòng 1 chỉ số.</p>
+        <textarea id="cfg-kpi-list" class="config-textarea" rows="19" placeholder="Mỗi dòng là 1 chỉ số..."></textarea>
+      </div>
+    </div>
+
+    <!-- Section 2: Benchmarks -->
+    <div class="config-section">
+      <div class="config-section-header" onclick="toggleConfigSection(this)">
+        <div class="config-section-title">
+          <span class="config-section-icon">🎯</span>
+          Benchmark chỉ số (Daily Operations)
+        </div>
+        <span class="config-section-toggle">▼</span>
+      </div>
+      <div class="config-section-body">
+        <p class="config-section-desc">Các ngưỡng benchmark theo từng nguồn. Dashboard sẽ dùng các giá trị này để đánh giá hiệu suất (xanh/vàng/đỏ).</p>
+
+        <div class="config-subsection-label" style="color:var(--red)">N1 — Optimize (MKT)</div>
+        <div class="config-grid">
+          <div class="config-field">
+            <label>CR16 N1 (%)</label>
+            <input type="number" id="cfg-bench-cr16-n1" step="0.01" placeholder="15">
+          </div>
+          <div class="config-field">
+            <label>CR46 N1 (%)</label>
+            <input type="number" id="cfg-bench-cr46-n1" step="0.01" placeholder="50">
+          </div>
+          <div class="config-field">
+            <label>AOV N1 (triệu)</label>
+            <input type="number" id="cfg-bench-aov-n1" step="0.1" placeholder="18">
+          </div>
+          <div class="config-field">
+            <label>No-show (%)</label>
+            <input type="number" id="cfg-bench-noshow" step="0.01" placeholder="20">
+          </div>
+        </div>
+
+        <div class="config-subsection-label" style="color:var(--blue)">N2 — Ops (Re/Upsell & Referral)</div>
+        <div class="config-grid">
+          <div class="config-field">
+            <label>CR Re/Upsell (%)</label>
+            <input type="number" id="cfg-bench-cr-reupsell" step="0.01" placeholder="15">
+          </div>
+          <div class="config-field">
+            <label>CR Referral (%)</label>
+            <input type="number" id="cfg-bench-cr-referral" step="0.01" placeholder="5">
+          </div>
+          <div class="config-field">
+            <label>AOV N2 (triệu)</label>
+            <input type="number" id="cfg-bench-aov-n2" step="0.1" placeholder="15">
+          </div>
+        </div>
+
+        <div class="config-subsection-label" style="color:var(--green)">N3 — Growth (Direct Sales)</div>
+        <div class="config-grid">
+          <div class="config-field">
+            <label>CR16 N3 (%)</label>
+            <input type="number" id="cfg-bench-cr16-n3" step="0.01" placeholder="10">
+          </div>
+          <div class="config-field">
+            <label>CR46 N3 (%)</label>
+            <input type="number" id="cfg-bench-cr46-n3" step="0.01" placeholder="40">
+          </div>
+          <div class="config-field">
+            <label>AOV N3 (triệu)</label>
+            <input type="number" id="cfg-bench-aov-n3" step="0.1" placeholder="16">
+          </div>
+        </div>
+
+        <div class="config-subsection-label">Blended (tổng hợp)</div>
+        <div class="config-grid">
+          <div class="config-field">
+            <label>CR16 Blended (%)</label>
+            <input type="number" id="cfg-bench-cr16" step="0.01" placeholder="15">
+          </div>
+          <div class="config-field">
+            <label>CR46 Blended (%)</label>
+            <input type="number" id="cfg-bench-cr46" step="0.01" placeholder="50">
+          </div>
+          <div class="config-field">
+            <label>AOV Blended (triệu)</label>
+            <input type="number" id="cfg-bench-aov" step="0.1" placeholder="18">
+          </div>
+        </div>
+        <div class="config-hint">Benchmark Blended dùng cho KPI cards tổng. Benchmark N1/N2/N3 dùng cho CR strip từng nguồn.</div>
+      </div>
+    </div>
+
+    <!-- Section 3: Tiến độ MTD (auto) -->
+    <div class="config-section">
+      <div class="config-section-header" onclick="toggleConfigSection(this)">
+        <div class="config-section-title">
+          <span class="config-section-icon">⏱️</span>
+          Tiến độ kỳ vọng MTD (Run Rate)
+        </div>
+        <span class="config-section-toggle">▼</span>
+      </div>
+      <div class="config-section-body">
+        <p class="config-section-desc">Tiến độ kỳ vọng được tính <strong>tự động theo ngày</strong> trong tháng. Ví dụ: ngày 15/30 → kỳ vọng đạt 50% KPI.</p>
+        <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:14px 16px;font-size:13px;color:var(--gray-600);line-height:1.6">
+          <strong>Công thức:</strong> Pace = (Ngày hiện tại - 1) ÷ Tổng ngày trong tháng<br>
+          <strong>So sánh:</strong> Doanh số MTD ÷ KPI Target → % đạt thực tế<br>
+          <strong>Trạng thái:</strong><br>
+          • <span style="color:var(--green);font-weight:600">Nhanh</span> — % đạt > Pace + 5%<br>
+          • <span style="color:var(--blue);font-weight:600">Đúng tiến độ</span> — % đạt trong khoảng Pace ± 5%<br>
+          • <span style="color:var(--orange);font-weight:600">Chậm</span> — % đạt < Pace - 5%<br>
+          • <span style="color:var(--red);font-weight:600">Nguy hiểm</span> — % đạt < Pace - 15%
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Import KPI Target -->
+    <div class="config-section">
+      <div class="config-section-header" onclick="toggleConfigSection(this)">
+        <div class="config-section-title">
+          <span class="config-section-icon">📈</span>
+          Import KPI Target theo tháng
+        </div>
+        <span class="config-section-toggle">▼</span>
+      </div>
+      <div class="config-section-body">
+        <p class="config-section-desc">Upload file Excel (.xlsx) chứa KPI target. Hệ thống tự động nhận diện cột BU, KPI N1, N2, N3, Tổng và match tên BU với danh sách hệ thống.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <label style="font-size:12px;font-weight:600;color:var(--gray-500)">Tháng:</label>
+          <select id="cfg-kpi-import-month" class="topbar-select" style="min-width:130px"></select>
+          <label class="btn btn-outline" style="font-size:12px;padding:6px 14px;cursor:pointer">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            Chọn file Excel
+            <input type="file" id="cfg-kpi-file" accept=".xlsx,.xls" style="display:none" onchange="onKPIFileSelected(this)">
+          </label>
+          <span id="cfg-kpi-filename" style="font-size:12px;color:var(--gray-500)"></span>
+        </div>
+        <!-- Preview table -->
+        <div id="cfg-kpi-preview" style="margin-bottom:10px"></div>
+        <!-- Import button (shown after preview) -->
+        <div id="cfg-kpi-actions" style="display:none;margin-bottom:10px">
+          <button class="btn btn-primary" onclick="confirmImportKPI()" style="font-size:12px;padding:6px 16px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
+            Xác nhận Import
+          </button>
+          <span id="cfg-kpi-import-status" style="font-size:12px;color:var(--gray-500);margin-left:8px"></span>
+        </div>
+        <!-- Hiển thị KPI đã import -->
+        <div id="cfg-kpi-imported" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- Section 5: BU List -->
+    <div class="config-section">
+      <div class="config-section-header" onclick="toggleConfigSection(this)">
+        <div class="config-section-title">
+          <span class="config-section-icon">🏢</span>
+          Danh sách BU
+        </div>
+        <span class="config-section-toggle">▼</span>
+      </div>
+      <div class="config-section-body">
+        <p class="config-section-desc">Danh sách tất cả BU trong hệ thống. Mỗi dòng 1 BU. Thay đổi sẽ ảnh hưởng tới dropdown CM và bảng Dashboard.</p>
+        <textarea id="cfg-bu-list" class="config-textarea" rows="12" placeholder="Mỗi dòng là 1 BU..."></textarea>
+        <div class="config-hint" id="cfg-bu-count"></div>
+      </div>
+    </div>
+
+  </div><!-- /config-sections -->
+
+</div><!-- /view-config -->
+
+<!-- ===================== DETAIL PANEL (Dashboard) ===================== -->
+<div id="detail-panel">
+  <div class="detail-header">
+    <div class="detail-header-info">
+      <div class="detail-bu-name" id="detail-bu-name">—</div>
+      <div class="detail-meta" id="detail-meta"></div>
+    </div>
+    <button class="detail-close" onclick="closeDetailPanel()" title="Đóng">✕</button>
+  </div>
+
+  <div class="detail-body">
+
+    <!-- Section A: Sức khỏe doanh số -->
+    <div id="detail-health-section">
+      <div class="detail-breakdown-title">Sức khỏe doanh số</div>
+      <div id="detail-health-badge" style="margin-bottom:12px"></div>
+      <table class="health-table" id="detail-health-table">
+        <thead>
+          <tr>
+            <th>Chỉ số</th>
+            <th style="text-align:right">Target</th>
+            <th style="text-align:right">Actual</th>
+            <th style="text-align:right">% Đạt</th>
+            <th style="text-align:center">Pace</th>
+          </tr>
+        </thead>
+        <tbody id="detail-health-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Section B: Điểm chất lượng -->
+    <div class="detail-total-score">
+      <div class="detail-total-val" id="detail-total-val">0</div>
+      <div class="detail-total-info">
+        <div class="detail-total-label">Tổng điểm / 100</div>
+        <span id="detail-total-rating" class="rating-badge">—</span>
+        <div class="score-bar" style="margin-top:8px">
+          <div class="score-bar-fill" id="detail-score-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-score-overview">
+      <div class="detail-score-box">
+        <div class="detail-score-max">/70</div>
+        <div class="detail-score-val" id="detail-ap-score">0</div>
+        <div class="detail-score-label">Action Plan</div>
+      </div>
+      <div class="detail-score-box">
+        <div class="detail-score-max">/30</div>
+        <div class="detail-score-val" id="detail-wr-score">0</div>
+        <div class="detail-score-label">Weekly Report</div>
+      </div>
+    </div>
+
+    <div class="detail-breakdown">
+      <div class="detail-breakdown-title">Chi tiết — Action Plan</div>
+      <div id="detail-ap-breakdown"></div>
+    </div>
+
+    <div class="detail-breakdown">
+      <div class="detail-breakdown-title">Chi tiết — Weekly Report</div>
+      <div id="detail-wr-breakdown"></div>
+    </div>
+
+    <!-- Section C: Chi tiết Action Plan (toggle) -->
+    <div id="detail-ap-detail-section">
+      <button id="btn-toggle-ap-detail" class="btn-toggle-ap-detail" onclick="toggleAPDetail()">
+        📋 Xem chi tiết Action Plan <span id="ap-detail-arrow">▶</span>
+      </button>
+      <div id="detail-ap-detail-content" style="display:none"></div>
+    </div>
+
+    <!-- Section D: AI Phân tích (chỉ hiện cho Vàng/Đỏ) -->
+    <div id="detail-ai-section" style="display:none">
+      <div class="detail-breakdown-title">🤖 AI Phân tích Action Plan</div>
+      <button id="btn-ai-analyze" class="btn-ai" onclick="analyzeWithAI(state.dashboard.selectedBU)">
+        🤖 Phân tích Action Plan bằng AI
+      </button>
+      <div id="detail-ai-content" style="margin-top:12px"></div>
+    </div>
+
+    <!-- Section D: FM Coaching Note -->
+    <div id="detail-fm-note-section">
+      <div class="detail-breakdown-title">📝 FM Coaching Note</div>
+      <div id="detail-fm-note-existing" style="margin-bottom:12px"></div>
+      <div class="fm-note-write-area">
+        <textarea id="fm-note-textarea" class="fm-note-textarea" rows="4" placeholder="Nhập ghi chú coaching cho CM của BU này..."></textarea>
+        <button class="btn btn-primary btn-sm" onclick="saveFMNote()" style="margin-top:8px">
+          💾 Lưu Note
+        </button>
+        <span id="fm-note-save-status" style="margin-left:8px;font-size:11px;color:#888"></span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== TRAINING DETAIL PANEL ===================== -->
+<div id="training-detail-panel">
+  <div class="detail-header training-detail-header">
+    <div class="detail-header-info">
+      <div class="detail-bu-name" id="training-detail-bu-name">—</div>
+      <div class="detail-meta" id="training-detail-meta"></div>
+    </div>
+    <button class="detail-close" onclick="closeTrainingDetail()" title="Đóng">✕</button>
+  </div>
+
+  <div class="detail-body">
+
+    <!-- Spider Chart -->
+    <div class="training-spider-section">
+      <div class="training-spider-title">Biểu đồ Năng lực CM (5 Tiêu chí)</div>
+      <canvas id="training-spider-canvas" width="300" height="300"></canvas>
+    </div>
+
+    <!-- Score Breakdown -->
+    <div class="training-score-breakdown">
+      <div class="detail-breakdown-title">Chi tiết từng tiêu chí</div>
+      <div id="training-detail-breakdown"></div>
+    </div>
+
+    <!-- Coaching Suggestion -->
+    <div id="training-coaching-section">
+      <div class="detail-breakdown-title">💡 Gợi ý coaching</div>
+      <div id="training-coaching-content" class="training-coaching-content"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== DISCUSSION VIEW ===================== -->
+<div id="view-discussion" class="view">
+
+  <!-- Sub-nav tabs (same as CM view) -->
+  <div class="tabs-bar cm-shared-tabs">
+    <button class="tab-btn tab-btn-link" onclick="navigate('cm')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Action Plan
+    </button>
+    <button class="tab-btn tab-btn-link" onclick="navigate('daily')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Daily Report
+    </button>
+    <button class="tab-btn active" data-tab="DISC_NAV">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Thảo luận
+    </button>
+    <button class="tab-btn tab-btn-link" onclick="switchToCMAnalytical()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Analytical
+    </button>
+  </div>
+
+  <!-- Header -->
+  <div class="discussion-header">
+    <div class="discussion-header-inner">
+      <div class="discussion-header-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="discussion-header-title">Thảo luận &amp; Hỏi đáp</h2>
+        <p class="discussion-header-sub">Không gian trao đổi ẩn danh dành cho CM</p>
+      </div>
+    </div>
+    <button class="discussion-refresh-btn" onclick="loadDiscussion()" title="Làm mới">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Làm mới
+    </button>
+  </div>
+
+  <!-- Ask Question Box -->
+  <div class="discussion-ask-box" id="discussion-ask-box">
+    <div class="discussion-ask-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Đặt câu hỏi mới
+    </div>
+    <div class="discussion-ask-anon-note" id="discussion-anon-note">
+      🔒 Câu hỏi của bạn sẽ hiển thị với biệt danh ngẫu nhiên — không ai biết bạn là ai
+    </div>
+    <div class="discussion-ask-fields">
+      <div class="discussion-ask-content">
+        <label class="discussion-ask-label">Đặt câu hỏi <span class="req">*</span></label>
+        <textarea id="discussion-question-input" class="discussion-ask-textarea" placeholder="Đặt câu hỏi của bạn... (ví dụ: Làm sao tăng tỷ lệ chuyển đổi trial? Có template follow-up nào hiệu quả không?)" rows="3"></textarea>
+      </div>
+    </div>
+    <div class="discussion-ask-footer">
+      <span class="discussion-char-count" id="discussion-char-count">0 / 500</span>
+      <div class="discussion-ask-actions">
+        <button class="disc-submit-btn disc-submit-discuss" onclick="submitQuestion('discuss')" title="Đăng câu hỏi để các CM cùng thảo luận">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Thảo luận cùng CM
+        </button>
+        <button class="disc-submit-btn disc-submit-mimi" onclick="submitQuestion('mimi')" title="Gửi câu hỏi và MiMi AI sẽ trả lời">
+          🤖 Hỏi MiMi
+        </button>
+        <button class="disc-submit-btn disc-submit-sod" onclick="submitQuestion('sod')" title="Gửi câu hỏi để HO (FM/SOD) trả lời qua Telegram">
+          ⭐ Hỏi HO
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Sort Toolbar -->
+  <div class="disc-toolbar">
+    <div class="disc-search-wrap">
+      <svg class="disc-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" class="disc-search-input" id="disc-search-input" placeholder="Tìm kiếm câu hỏi..." oninput="onDiscussionSearch(this.value)">
+    </div>
+    <div class="disc-sort-wrap">
+      <button class="disc-sort-btn active" data-sort="newest" onclick="setDiscussionSort('newest')">Mới nhất</button>
+      <button class="disc-sort-btn" data-sort="hot" onclick="setDiscussionSort('hot')"> 🔥 Nổi bật</button>
+      <button class="disc-sort-btn" data-sort="most_replies" onclick="setDiscussionSort('most_replies')"> 💬 Nhiều bình luận</button>
+    </div>
+  </div>
+  <div class="discussion-list-header">
+    <span class="discussion-list-title" id="discussion-total-label">Câu hỏi</span>
+  </div>
+
+  <div id="discussion-list" class="discussion-list">
+    <div class="discussion-loading" id="discussion-loading">
+      <div class="discussion-spinner"></div>
+      <span>Đang tải câu hỏi...</span>
+    </div>
+  </div>
+
+  <!-- Load More -->
+  <div id="discussion-load-more" style="display:none;text-align:center;padding:16px">
+    <button class="btn btn-secondary" onclick="loadMoreQuestions()">Tải thêm câu hỏi</button>
+  </div>
+
+</div>
+
+<!-- ===================== DAILY REPORT VIEW ===================== -->
+<div id="view-daily" class="view">
+
+  <!-- Sub-nav tabs (same as CM view) -->
+  <div class="tabs-bar cm-shared-tabs">
+    <button class="tab-btn tab-btn-link" onclick="navigate('cm')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Action Plan
+    </button>
+    <button class="tab-btn active" data-tab="DAILY_NAV">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Daily Report
+    </button>
+    <button class="tab-btn tab-btn-link" onclick="navigate('discussion')">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Thảo luận
+    </button>
+    <button class="tab-btn tab-btn-link" onclick="switchToCMAnalytical()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Analytical
+    </button>
+  </div>
+
+  <!-- Topbar -->
+  <div class="view-topbar daily-topbar">
+    <span class="topbar-label">BU</span>
+    <select id="daily-bu" class="topbar-select">
+      <option value="">— Chọn BU —</option>
+    </select>
+
+    <span class="topbar-label">Ngày</span>
+    <input type="date" id="daily-date" class="topbar-select" style="width:160px">
+
+    <div class="topbar-spacer"></div>
+
+    <span id="daily-saved-indicator" class="saved-indicator">Chưa lưu</span>
+  </div>
+
+  <!-- Form container -->
+  <div id="daily-form-container" class="daily-sections">
+
+    <!-- N1 OPTIMIZE -->
+    <div class="daily-section daily-section-n1">
+      <div class="daily-section-header daily-header-n1">N1 — OPTIMIZE</div>
+      <div class="daily-field-grid" id="daily-fields-N1"></div>
+    </div>
+
+    <!-- N2 OPS -->
+    <div class="daily-section daily-section-n2">
+      <div class="daily-section-header daily-header-n2">N2 — OPS</div>
+      <div class="daily-field-grid" id="daily-fields-N2"></div>
+    </div>
+
+    <!-- N3 GROWTH -->
+    <div class="daily-section daily-section-n3">
+      <div class="daily-section-header daily-header-n3">N3 — GROWTH</div>
+      <div class="daily-field-grid" id="daily-fields-N3"></div>
+    </div>
+
+    <!-- TỔNG HỢP -->
+    <div class="daily-section daily-section-total">
+      <div class="daily-section-header daily-header-total">TỔNG HỢP</div>
+      <div class="daily-field-grid">
+        <div class="daily-field daily-total-highlight">
+          <label>Tổng Deal BU</label>
+          <input type="number" id="daily-total-deal" class="daily-input-total" value="0" readonly>
+        </div>
+        <div class="daily-field daily-total-highlight">
+          <label>Tổng Doanh số (triệu)</label>
+          <input type="number" id="daily-total-revenue" class="daily-input-total" value="0" readonly>
+        </div>
+        <div class="daily-field daily-field-note">
+          <label>Ghi chú</label>
+          <textarea id="daily-note" rows="3" placeholder="Ghi chú thêm..." oninput="updateDailyData('note', this.value)"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save button -->
+    <div class="daily-save-row">
+      <button class="btn btn-primary" id="btn-save-daily" onclick="saveDailyReport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Lưu Daily Report
+      </button>
+    </div>
+  </div>
+
+  <!-- MTD Summary -->
+  <div id="daily-mtd-panel" class="daily-mtd-panel" style="display:none">
+    <div class="daily-mtd-header">
+      <h3>MTD Summary</h3>
+      <span id="daily-mtd-meta" class="daily-mtd-meta"></span>
+    </div>
+    <div id="daily-mtd-content" class="daily-mtd-content"></div>
+  </div>
+
+</div>
+
+<!-- ======= PASSWORD MODAL ======= -->
+<div id="pw-modal" class="pw-modal-overlay">
+  <div class="pw-modal-box">
+    <div class="pw-modal-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cc0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div class="pw-modal-title">Truy cập hạn chế</div>
+    <div class="pw-modal-desc">Vui lòng nhập mật khẩu để truy cập khu vực này</div>
+    <input type="password" id="pw-input" class="pw-modal-input" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')submitPassword()" autocomplete="off">
+    <div id="pw-error" class="pw-modal-error" style="display:none"></div>
+    <div class="pw-modal-actions">
+      <button class="pw-modal-btn pw-btn-cancel" onclick="closePasswordModal()">Hủy</button>
+      <button class="pw-modal-btn pw-btn-submit" onclick="submitPassword()">Xác nhận</button>
+    </div>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
