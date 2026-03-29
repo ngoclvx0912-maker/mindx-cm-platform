@@ -5310,59 +5310,83 @@ function computeDelta(current, prev) {
 
 /** Helper: compute sums object from a filtered data array */
 function computeDopsums(rows, buFilter) {
+  const fields = getDailyFields();
   const filtered = buFilter === 'ALL' ? rows : rows.filter(r => r.bu === buFilter);
+
+  // Sum all numeric fields
   const s = {};
-  getDailyFields().forEach(f => { if (f.type === 'number') s[f.id] = 0; });
+  fields.forEach(f => { if (f.type === 'number') s[f.id] = 0; });
   filtered.forEach(row => {
-    getDailyFields().forEach(f => {
+    fields.forEach(f => {
       if (f.type === 'number') s[f.id] += parseInt(row[f.id]) || 0;
     });
   });
-  // Outlier filtering for deal counts
+
+  // Outlier filtering: zero out deal fields > 1000 (likely revenue entered in wrong field)
+  const dealFields = fields.filter(f => f.role === 'deal');
   const cleanFiltered = filtered.map(row => {
     const r = Object.assign({}, row);
-    if ((parseInt(r.deal_n1)||0) > 1000) r.deal_n1 = 0;
-    if ((parseInt(r.deal_reupsell)||0) > 1000) r.deal_reupsell = 0;
-    if ((parseInt(r.deal_referral)||0) > 1000) r.deal_referral = 0;
-    if ((parseInt(r.deal_n3)||0) > 1000) r.deal_n3 = 0;
+    dealFields.forEach(df => {
+      if ((parseInt(r[df.id]) || 0) > 1000) r[df.id] = 0;
+    });
     return r;
   });
-  let cleanDealN1 = 0, cleanDealReupsell = 0, cleanDealReferral = 0, cleanDealN3 = 0;
-  cleanFiltered.forEach(row => {
-    cleanDealN1 += parseInt(row.deal_n1) || 0;
-    cleanDealReupsell += parseInt(row.deal_reupsell) || 0;
-    cleanDealReferral += parseInt(row.deal_referral) || 0;
-    cleanDealN3 += parseInt(row.deal_n3) || 0;
+
+  // Clean deal sums per group
+  const cleanDeals = {}; // { N1: 0, N2: 0, N3: 0 }
+  const cleanDealsByField = {};
+  dealFields.forEach(df => {
+    cleanDealsByField[df.id] = 0;
+    cleanFiltered.forEach(row => { cleanDealsByField[df.id] += parseInt(row[df.id]) || 0; });
+    cleanDeals[df.group] = (cleanDeals[df.group] || 0) + cleanDealsByField[df.id];
   });
-  const cleanDealN2 = cleanDealReupsell + cleanDealReferral;
-  const cleanDealTotal = cleanDealN1 + cleanDealN2 + cleanDealN3;
-  const totalRev = (s.revenue_n1||0) + (s.revenue_n2||0) + (s.revenue_n3||0);
-  // CRs
-  const cr16_n1 = s.lead_mkt > 0 ? (cleanDealN1 / s.lead_mkt * 100) : 0;
-  const cr46_n1 = (s.trial_mkt||0) > 0 ? (cleanDealN1 / s.trial_mkt * 100) : 0;
-  const aov_n1 = cleanDealN1 > 0 ? (s.revenue_n1 / cleanDealN1) : 0;
-  const crReupsell = (s.lead_referral||0) > 0 ? (cleanDealReupsell / s.lead_referral * 100) : 0;
-  const crReferral = (s.lead_referral||0) > 0 ? (cleanDealReferral / s.lead_referral * 100) : 0;
-  const aov_n2 = cleanDealN2 > 0 ? (s.revenue_n2 / cleanDealN2) : 0;
-  const cr16_n3 = s.lead_n3 > 0 ? (cleanDealN3 / s.lead_n3 * 100) : 0;
-  const cr46_n3 = s.trial_n3 > 0 ? (cleanDealN3 / s.trial_n3 * 100) : 0;
-  const aov_n3 = cleanDealN3 > 0 ? (s.revenue_n3 / cleanDealN3) : 0;
-  const totalLeadAll = (s.lead_mkt||0) + (s.lead_n3||0);
-  const totalTrialAll = (s.trial_mkt||0) + (s.trial_n3||0);
-  const cleanDealBlend = cleanDealN1 + cleanDealN3;
-  const cr16 = totalLeadAll > 0 ? (cleanDealBlend / totalLeadAll * 100) : 0;
-  const cr46 = totalTrialAll > 0 ? (cleanDealBlend / totalTrialAll * 100) : 0;
+  const cleanDealTotal = Object.values(cleanDeals).reduce((a, b) => a + b, 0);
+
+  // Revenue sums per group
+  const revByGroup = {};
+  fields.filter(f => f.role === 'revenue').forEach(f => {
+    revByGroup[f.group] = (revByGroup[f.group] || 0) + (s[f.id] || 0);
+  });
+  const totalRev = Object.values(revByGroup).reduce((a, b) => a + b, 0);
+
+  // CR calculations per group (dynamic)
+  const crByGroup = {}; // { N1: { cr16, cr46, aov }, N2: {...}, N3: {...} }
+  ['N1', 'N2', 'N3'].forEach(g => {
+    const leads = fields.filter(f => f.group === g && (f.role === 'lead' || f.role === 'referral_lead'))
+      .reduce((sum, f) => sum + (s[f.id] || 0), 0);
+    const trials = fields.filter(f => f.group === g && f.role === 'trial')
+      .reduce((sum, f) => sum + (s[f.id] || 0), 0);
+    const deals = cleanDeals[g] || 0;
+    const rev = revByGroup[g] || 0;
+    crByGroup[g] = {
+      cr16: leads > 0 ? (deals / leads * 100) : 0,
+      cr46: trials > 0 ? (deals / trials * 100) : 0,
+      aov: deals > 0 ? (rev / deals) : 0,
+      leads, trials, deals, rev
+    };
+  });
+
+  // Blended CRs
+  const totalLeadAll = Object.values(crByGroup).reduce((sum, g) => sum + g.leads, 0);
+  const totalTrialAll = Object.values(crByGroup).reduce((sum, g) => sum + g.trials, 0);
+  const cr16 = totalLeadAll > 0 ? (cleanDealTotal / totalLeadAll * 100) : 0;
+  const cr46 = totalTrialAll > 0 ? (cleanDealTotal / totalTrialAll * 100) : 0;
   const aovAll = cleanDealTotal > 0 ? (totalRev / cleanDealTotal) : 0;
+
   const uniqueBUs = new Set(filtered.map(r => r.bu));
   const uniqueDays = new Set(filtered.map(r => r.date));
+
   return {
     raw: s, filtered, uniqueBUs, uniqueDays,
-    cleanDealN1, cleanDealReupsell, cleanDealReferral, cleanDealN3,
-    cleanDealN2, cleanDealTotal, totalRev,
-    cr16_n1, cr46_n1, aov_n1,
-    crReupsell, crReferral, aov_n2,
-    cr16_n3, cr46_n3, aov_n3,
-    cr16, cr46, aovAll
+    cleanDealsByField, cleanDeals, cleanDealTotal, totalRev, revByGroup,
+    crByGroup, cr16, cr46, aovAll,
+    // Backward compat aliases
+    cleanDealN1: cleanDeals.N1||0, cleanDealN2: cleanDeals.N2||0, cleanDealN3: cleanDeals.N3||0,
+    cleanDealReupsell: cleanDealsByField.deal_reupsell||0,
+    cleanDealReferral: cleanDealsByField.deal_referral||0,
+    cr16_n1: crByGroup.N1?.cr16||0, cr46_n1: crByGroup.N1?.cr46||0, aov_n1: crByGroup.N1?.aov||0,
+    crReupsell: crByGroup.N2?.cr16||0, crReferral: 0, aov_n2: crByGroup.N2?.aov||0,
+    cr16_n3: crByGroup.N3?.cr16||0, cr46_n3: crByGroup.N3?.cr46||0, aov_n3: crByGroup.N3?.aov||0
   };
 }
 
@@ -5445,71 +5469,40 @@ function renderDailyOps() {
     higherIsBetter: false
   });
 
-  // ---- N1 Section ----
-  renderDopsSection('dops-metrics-n1', [
-    { label: 'L1 Lead MKT', icon: '\uD83D\uDCE3', value: fmtDops(s.lead_mkt, 'count'),
-      rawCur: s.lead_mkt, rawPrev: prev ? prev.raw.lead_mkt : null, type: 'count', higherIsBetter: true },
-    { label: 'S\u1ED1 cu\u1ED9c g\u1ECDi N1', icon: '\uD83D\uDCDE', value: fmtDops(s.calls_n1, 'count'),
-      rawCur: s.calls_n1, rawPrev: prev ? prev.raw.calls_n1 : null, type: 'count', higherIsBetter: true },
-    { label: 'L4 Trial MKT', icon: '\u2705', value: fmtDops(s.trial_mkt, 'count'),
-      rawCur: s.trial_mkt, rawPrev: prev ? prev.raw.trial_mkt : null, type: 'count', higherIsBetter: true },
-    { label: 'L6 Deal MKT', icon: '\uD83C\uDFC6', value: fmtDops(cur.cleanDealN1, 'count'),
-      rawCur: cur.cleanDealN1, rawPrev: prev ? prev.cleanDealN1 : null, type: 'count', higherIsBetter: true },
-    { label: 'Doanh s\u1ED1 N1', icon: '\uD83D\uDCB0', value: fmtDops(s.revenue_n1, 'money'),
-      rawCur: s.revenue_n1, rawPrev: prev ? prev.raw.revenue_n1 : null, type: 'money', higherIsBetter: true }
-  ]);
-  renderCRStrip('dops-cr-n1', [
-    { label: 'CR16 (N1)', value: cur.cr16_n1, rawPrev: prev ? prev.cr16_n1 : null,
-      bench: 15, benchLabel: 'BM: 15%' },
-    { label: 'CR46 (N1)', value: cur.cr46_n1, rawPrev: prev ? prev.cr46_n1 : null,
-      bench: 50, benchLabel: 'BM: 50%' },
-    { label: 'AOV (N1)', value: cur.aov_n1, rawPrev: prev ? prev.aov_n1 : null,
-      suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
-  ]);
+  // ---- Render N1/N2/N3 Sections DYNAMICALLY from getDailyFields() ----
+  const roleIcons = { lead: '📣', call: '📞', trial_book: '📋', trial: '✅', deal: '🏆', revenue: '💰', activity: '🚶', referral_lead: '🤝', note: '📝' };
+  const fields = getDailyFields();
 
-  // ---- N2 Section ----
-  renderDopsSection('dops-metrics-n2', [
-    { label: 'S\u1ED1 cu\u1ED9c g\u1ECDi CSKH', icon: '\uD83D\uDCF1', value: fmtDops(s.calls_cskh, 'count'),
-      rawCur: s.calls_cskh, rawPrev: prev ? prev.raw.calls_cskh : null, type: 'count', higherIsBetter: true },
-    { label: 'L6 Re/Upsell', icon: '\uD83D\uDD04', value: fmtDops(cur.cleanDealReupsell, 'count'),
-      rawCur: cur.cleanDealReupsell, rawPrev: prev ? prev.cleanDealReupsell : null, type: 'count', higherIsBetter: true },
-    { label: 'L2 Referral', icon: '\uD83E\uDD1D', value: fmtDops(s.lead_referral, 'count'),
-      rawCur: s.lead_referral, rawPrev: prev ? prev.raw.lead_referral : null, type: 'count', higherIsBetter: true },
-    { label: 'L6 Referral', icon: '\uD83C\uDFC6', value: fmtDops(cur.cleanDealReferral, 'count'),
-      rawCur: cur.cleanDealReferral, rawPrev: prev ? prev.cleanDealReferral : null, type: 'count', higherIsBetter: true },
-    { label: 'Doanh s\u1ED1 N2', icon: '\uD83D\uDCB0', value: fmtDops(s.revenue_n2, 'money'),
-      rawCur: s.revenue_n2, rawPrev: prev ? prev.raw.revenue_n2 : null, type: 'money', higherIsBetter: true }
-  ]);
-  renderCRStrip('dops-cr-n2', [
-    { label: 'CR Re/Upsell', value: cur.crReupsell, rawPrev: prev ? prev.crReupsell : null,
-      bench: null },
-    { label: 'CR Referral', value: cur.crReferral, rawPrev: prev ? prev.crReferral : null,
-      bench: null },
-    { label: 'AOV (N2)', value: cur.aov_n2, rawPrev: prev ? prev.aov_n2 : null,
-      suffix: 'AOV', bench: null }
-  ]);
+  ['N1', 'N2', 'N3'].forEach(group => {
+    const groupFields = fields.filter(f => f.group === group && f.type === 'number');
+    const metrics = groupFields.map(f => {
+      const isDeal = f.role === 'deal';
+      const isRev = f.role === 'revenue';
+      const rawCurVal = isDeal ? (cur.cleanDealsByField[f.id] || 0) : (s[f.id] || 0);
+      const rawPrevVal = prev ? (isDeal ? (prev.cleanDealsByField[f.id] || 0) : (prev.raw[f.id] || 0)) : null;
+      const fmtType = isRev ? 'money' : 'count';
+      return {
+        label: f.label, icon: roleIcons[f.role] || '📊',
+        value: fmtDops(rawCurVal, fmtType),
+        rawCur: rawCurVal, rawPrev: rawPrevVal,
+        type: fmtType, higherIsBetter: true
+      };
+    });
+    renderDopsSection(`dops-metrics-${group.toLowerCase()}`, metrics);
 
-  // ---- N3 Section ----
-  renderDopsSection('dops-metrics-n3', [
-    { label: 'L1 Leads t\u1EF1 ki\u1EBFm', icon: '\uD83D\uDD0D', value: fmtDops(s.lead_n3, 'count'),
-      rawCur: s.lead_n3, rawPrev: prev ? prev.raw.lead_n3 : null, type: 'count', higherIsBetter: true },
-    { label: 'S\u1ED1 cu\u1ED9c g\u1ECDi N3', icon: '\uD83D\uDCDE', value: fmtDops(s.calls_n3, 'count'),
-      rawCur: s.calls_n3, rawPrev: prev ? prev.raw.calls_n3 : null, type: 'count', higherIsBetter: true },
-    { label: 'L4 Trials', icon: '\u2705', value: fmtDops(s.trial_n3, 'count'),
-      rawCur: s.trial_n3, rawPrev: prev ? prev.raw.trial_n3 : null, type: 'count', higherIsBetter: true },
-    { label: 'L6 Deals', icon: '\uD83C\uDFC6', value: fmtDops(cur.cleanDealN3, 'count'),
-      rawCur: cur.cleanDealN3, rawPrev: prev ? prev.cleanDealN3 : null, type: 'count', higherIsBetter: true },
-    { label: 'Doanh s\u1ED1 N3', icon: '\uD83D\uDCB0', value: fmtDops(s.revenue_n3, 'money'),
-      rawCur: s.revenue_n3, rawPrev: prev ? prev.raw.revenue_n3 : null, type: 'money', higherIsBetter: true }
-  ]);
-  renderCRStrip('dops-cr-n3', [
-    { label: 'CR16 (N3)', value: cur.cr16_n3, rawPrev: prev ? prev.cr16_n3 : null,
-      bench: 15, benchLabel: 'BM: 15%' },
-    { label: 'CR46 (N3)', value: cur.cr46_n3, rawPrev: prev ? prev.cr46_n3 : null,
-      bench: 50, benchLabel: 'BM: 50%' },
-    { label: 'AOV (N3)', value: cur.aov_n3, rawPrev: prev ? prev.aov_n3 : null,
-      suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
-  ]);
+    // CR strip for this group
+    const gCR = cur.crByGroup[group] || {};
+    const pCR = prev ? (prev.crByGroup[group] || {}) : null;
+    const crChips = [
+      { label: `CR16 (${group})`, value: gCR.cr16 || 0, rawPrev: pCR ? pCR.cr16 : null,
+        bench: 15, benchLabel: 'BM: 15%' },
+      { label: `CR46 (${group})`, value: gCR.cr46 || 0, rawPrev: pCR ? pCR.cr46 : null,
+        bench: 50, benchLabel: 'BM: 50%' },
+      { label: `AOV (${group})`, value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
+        suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
+    ];
+    renderCRStrip(`dops-cr-${group.toLowerCase()}`, crChips);
+  });
 
   // Source filter visibility
   document.getElementById('dops-section-n1').style.display = (sourceFilter === 'ALL' || sourceFilter === 'N1') ? '' : 'none';
