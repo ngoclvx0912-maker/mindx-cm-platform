@@ -1,5 +1,5 @@
 // MindX CM Report Platform - app.js
-// Phiên bản: 2-tab (Action Plan + Weekly Report)
+// Phiên bản: Action Plan only (WR đã loại bỏ)
 // Backend: Google Apps Script Web App (Google Sheets)
 'use strict';
 
@@ -17,9 +17,7 @@ const state = {
   currentView: 'landing',
   cm: {
     bu: '',
-    // WR and AP can be different month/week (auto-detected)
-    wrMonth: '',
-    wrWeek: 1,
+    // AP period — tính trực tiếp từ ngày hiện tại
     apMonth: '',
     apWeek: 1,
     activeTab: 'AP',
@@ -188,8 +186,10 @@ function fmtMonth(year, month) {
 }
 
 /**
- * Tự động xác định kỳ báo cáo dựa trên ngày hiện tại
- * @returns {{ wr: {month, week, label}, ap: {month, week, label}, isLocked, lockMessage, deadlineLabel }}
+ * Tự động xác định chu kỳ AP dựa trên ngày hiện tại.
+ * AP = tuần tiếp theo (kế hoạch cho tuần sắp tới).
+ * CM ghi và FM đọc cùng dùng chung chu kỳ này.
+ * @returns {{ ap: {month, week, label}, isLocked, lockMessage, deadlineLabel, todayName }}
  */
 function detectReportPeriod(now) {
   if (!now) now = new Date();
@@ -200,18 +200,7 @@ function detectReportPeriod(now) {
 
   const currentWeek = getWeekOfMonth(dayOfMonth);
 
-  // WR period (giữ lại cho logic FM Dashboard dù CM không điền WR nữa)
-  let wrMonth, wrWeek;
-  if (currentWeek === 1) {
-    const prev = getPrevMonth(year, month);
-    wrMonth = fmtMonth(prev.year, prev.month);
-    wrWeek = 4;
-  } else {
-    wrMonth = fmtMonth(year, month);
-    wrWeek = currentWeek - 1;
-  }
-
-  // AP = tuần TIỪP THEO (kế hoạch cho tuần sắp tới)
+  // AP = tuần TIẾP THEO (kế hoạch cho tuần sắp tới)
   let apMonth, apWeek;
   if (currentWeek < 4) {
     apMonth = fmtMonth(year, month);
@@ -224,10 +213,7 @@ function detectReportPeriod(now) {
   }
 
   // Deadline: khóa chỉ T5 và T6. Mở lại từ T7.
-  // dayOfWeek: 0=CN, 1=T2, 2=T3, 3=T4, 4=T5, 5=T6, 6=T7
-  // Mở: T7(6), CN(0), T2(1), T3(2), T4(3) → 5 ngày
-  // Khóa: T5(4), T6(5) → 2 ngày
-  const isLocked = dayOfWeek === 4 || dayOfWeek === 5; // Chỉ T5, T6 → khóa
+  const isLocked = dayOfWeek === 4 || dayOfWeek === 5;
 
   const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
   const todayName = dayNames[dayOfWeek];
@@ -238,20 +224,10 @@ function detectReportPeriod(now) {
     lockMessage = `Đã khóa chỉnh sửa (hôm nay ${todayName}). Mở lại vào Thứ 7.`;
     deadlineLabel = 'Đã khóa';
   } else {
-    // Tính số ngày còn lại đến hết T4
-    // Các ngày mở: T7(6) CN(0) T2(1) T3(2) T4(3)
-    // Deadline = hết T4 (dayOfWeek=3)
     let daysUntilDeadline;
-    if (dayOfWeek === 6) {
-      // T7 → còn T7, CN, T2, T3, T4 = 5 ngày (kể cả hôm nay)
-      daysUntilDeadline = 5;
-    } else if (dayOfWeek === 0) {
-      // CN → còn CN, T2, T3, T4 = 4 ngày
-      daysUntilDeadline = 4;
-    } else {
-      // T2(1)→3, T3(2)→2, T4(3)→1
-      daysUntilDeadline = 3 - dayOfWeek + 1;
-    }
+    if (dayOfWeek === 6) daysUntilDeadline = 5;
+    else if (dayOfWeek === 0) daysUntilDeadline = 4;
+    else daysUntilDeadline = 3 - dayOfWeek + 1;
     if (dayOfWeek === 3) {
       deadlineLabel = 'Hạn cuối hôm nay (Thứ 4)';
     } else {
@@ -260,18 +236,12 @@ function detectReportPeriod(now) {
     lockMessage = '';
   }
 
-  // Label hiển thị
   function monthLabel(m) {
     const [y, mo] = m.split('-');
     return `Tháng ${parseInt(mo)}/${y}`;
   }
 
   return {
-    wr: {
-      month: wrMonth,
-      week: wrWeek,
-      label: `${monthLabel(wrMonth)} — Tuần ${wrWeek}`
-    },
     ap: {
       month: apMonth,
       week: apWeek,
@@ -514,14 +484,14 @@ function initRouting() {
 
 // ===================== TOPBAR SELECTS =====================
 /**
- * Tạo danh sách kỳ báo cáo gần nhất (8 kỳ trước + kỳ hiện tại)
- * Kỳ báo cáo = WR period (tuần vừa qua mà CM báo cáo)
+ * Tạo danh sách chu kỳ AP gần nhất (8 chu kỳ trước + chu kỳ hiện tại)
+ * CM và FM dùng chung chu kỳ này để ghi/đọc AP
  */
 function generatePeriodHistory(currentPeriod) {
   const periods = [];
-  // Bắt đầu từ kỳ hiện tại, lùi dần về trước
-  let m = currentPeriod.wr.month;
-  let w = currentPeriod.wr.week;
+  // Bắt đầu từ chu kỳ AP hiện tại, lùi dần về trước
+  let m = currentPeriod.ap.month;
+  let w = currentPeriod.ap.week;
 
   for (let i = 0; i < 9; i++) {
     const [y, mo] = m.split('-');
@@ -566,8 +536,6 @@ function populateSelects() {
   // Auto-detect period for CM
   const period = detectReportPeriod();
   state.cm.period = period;
-  state.cm.wrMonth = period.wr.month;
-  state.cm.wrWeek = period.wr.week;
   state.cm.apMonth = period.ap.month;
   state.cm.apWeek = period.ap.week;
   state.cm.isLocked = period.isLocked;
@@ -577,12 +545,13 @@ function populateSelects() {
   updateCMPeriodDisplay();
 
   // Dashboard: auto-detect period + populate history
+  // FM Dashboard dùng cùng chu kỳ AP với CM Dashboard
   const dashPeriods = generatePeriodHistory(period);
   state.dashboard.periodHistory = dashPeriods;
 
-  // Set dashboard mặc định = kỳ hiện tại (WR period)
-  state.dashboard.month = period.wr.month;
-  state.dashboard.week = period.wr.week;
+  // Set dashboard mặc định = chu kỳ AP hiện tại
+  state.dashboard.month = period.ap.month;
+  state.dashboard.week = period.ap.week;
 
   // Populate period history dropdown
   const histSel = document.getElementById('dash-period-history');
@@ -598,12 +567,12 @@ function populateSelects() {
   updateDashPeriodDisplay();
 
   // Training: chỉ dùng tháng (không theo tuần)
-  state.training.month = period.wr.month;
+  state.training.month = period.ap.month;
 
   // Populate training month dropdown
   const trainingHistSel = document.getElementById('training-period-history');
   if (trainingHistSel) {
-    const currentTrainingMonth = period.wr.month;
+    const currentTrainingMonth = period.ap.month;
     MONTHS.forEach(m => {
       const o = document.createElement('option');
       o.value = m;
@@ -639,26 +608,7 @@ function updateTrainingPeriodDisplay() {
   el.textContent = `Tháng ${parseInt(mo)}/${y}`;
 }
 
-/** Khi FM/SOD chọn kỳ khác từ dropdown */
-/**
- * Tính AP period tương ứng với WR period đã chọn.
- * CM lưu AP cho "tuần hiện tại" (= tuần tiếp theo của WR).
- * VD: WR = 2026-02 W4 → AP = 2026-03 W2 (currentWeek=W1, AP=W1+1=W2? No...)
- * Thực tế: WR = W1 → AP = W3, WR = W2 → AP = W4, WR = W3 → AP = T+1/W1
- */
-function getAPPeriodFromWR(wrMonth, wrWeek) {
-  // AP = WR + 2 (vì currentWeek = WR+1, AP = currentWeek+1 = WR+2)
-  const w = parseInt(wrWeek);
-  const apWeek = w + 2;
-  if (apWeek <= 4) {
-    return { month: wrMonth, week: apWeek };
-  } else {
-    // Vượt W4 → W1 tháng sau
-    const [y, mo] = wrMonth.split('-');
-    const next = getNextMonth(parseInt(y), parseInt(mo));
-    return { month: fmtMonth(next.year, next.month), week: 1 };
-  }
-}
+/** Hàm getAPPeriodFromWR đã loại bỏ — không còn dùng WR logic */
 
 function onDashPeriodChange() {
   const histSel = document.getElementById('dash-period-history');
@@ -689,9 +639,7 @@ function updateCMPeriodDisplay() {
   if (!period) return;
 
   // Update period labels
-  const wrPeriodEl = document.getElementById('cm-wr-period');
   const apPeriodEl = document.getElementById('cm-ap-period');
-  if (wrPeriodEl) wrPeriodEl.textContent = period.wr.label;
   if (apPeriodEl) apPeriodEl.textContent = period.ap.label;
 
   // Update lock status badge
@@ -829,11 +777,10 @@ function onCMSelectionChange() {
 }
 
 async function loadCMData() {
-  const { bu, wrMonth, wrWeek, apMonth, apWeek } = state.cm;
+  const { bu, apMonth, apWeek } = state.cm;
   if (!bu) return;
 
   if (!isConfigured()) {
-    // Dùng mặc định khi chưa cấu hình
     state.cm.apRows = AP_DEFAULT_ROWS.map(r => ({ ...r }));
     state.cm.wrRows = WR_DEFAULT_ROWS.map(r => ({ ...r }));
     state.cm.savedAt = { AP: null, WR: null };
@@ -845,11 +792,8 @@ async function loadCMData() {
   }
 
   try {
-    // AP và WR có thể ở khác tháng/tuần → tải riêng
-    const [rAP, rWR] = await Promise.all([
-      apiFetch('get', { tab: 'AP', bu, month: apMonth, week: apWeek }),
-      apiFetch('get', { tab: 'WR', bu, month: wrMonth, week: wrWeek })
-    ]);
+    // Chỉ tải AP — không còn WR
+    const rAP = await apiFetch('get', { tab: 'AP', bu, month: apMonth, week: apWeek });
 
     // Action Plan
     if (rAP.rows && rAP.rows.length > 0) {
@@ -860,14 +804,9 @@ async function loadCMData() {
       state.cm.savedAt.AP = null;
     }
 
-    // Weekly Report
-    if (rWR.rows && rWR.rows.length > 0) {
-      state.cm.wrRows = rWR.rows;
-      state.cm.savedAt.WR = rWR.saved_at || null;
-    } else {
-      state.cm.wrRows = WR_DEFAULT_ROWS.map(r => ({ ...r }));
-      state.cm.savedAt.WR = null;
-    }
+    // WR: giữ mặc định (không tải từ server)
+    state.cm.wrRows = WR_DEFAULT_ROWS.map(r => ({ ...r }));
+    state.cm.savedAt.WR = null;
 
     renderAPTable();
     renderWRTable();
@@ -875,7 +814,6 @@ async function loadCMData() {
     updateDiagnosticVisibility();
   } catch(e) {
     showToast('Lỗi tải dữ liệu: ' + e.message, 'error');
-    // Fallback về mặc định
     state.cm.apRows = AP_DEFAULT_ROWS.map(r => ({ ...r }));
     state.cm.wrRows = WR_DEFAULT_ROWS.map(r => ({ ...r }));
     renderAPTable();
@@ -1081,9 +1019,9 @@ async function saveTab(tab) {
   if (!bu) { showToast('Vui lòng chọn BU trước khi lưu', 'error'); return; }
   if (isLocked) { showToast('Đã khóa chỉnh sửa. Không thể lưu sau Thứ 4.', 'error'); return; }
 
-  // Determine month/week based on which tab is being saved
-  const month = tab === 'AP' ? state.cm.apMonth : state.cm.wrMonth;
-  const week = tab === 'AP' ? state.cm.apWeek : state.cm.wrWeek;
+  // Dùng AP month/week cho tất cả (WR đã loại bỏ)
+  const month = state.cm.apMonth;
+  const week = state.cm.apWeek;
 
   if (!isConfigured()) {
     showToast('Chưa cấu hình Google Apps Script URL. Xem SETUP.md để biết cách thiết lập.', 'error');
@@ -1479,10 +1417,9 @@ async function runAnalysis() {
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải cấu hình...';
     await preloadConfigForMonth(month);
 
-    // Fetch AP data — dùng getAPPeriodFromWR (đã fix: AP = WR+2)
-    const apPeriod = getAPPeriodFromWR(month, week);
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải AP (${apPeriod.month} W${apPeriod.week})...';
-    const apData = await apiFetch('all_data', { month: apPeriod.month, week: apPeriod.week });
+    // Fetch AP data — dùng trực tiếp month/week từ dashboard (= chu kỳ AP)
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải AP (${month} W${week})...';
+    const apData = await apiFetch('all_data', { month, week });
 
     // Build allData chỉ từ AP (không cần WR nữa)
     const allData = {};
@@ -2254,7 +2191,7 @@ function updateDiagnosticButton() {
 
 /** Run AI Diagnostic Coach */
 async function runDiagnostic() {
-  const { bu, wrMonth, wrWeek, wrRows } = state.cm;
+  const { bu, apMonth, apWeek, wrRows } = state.cm;
   if (!bu) {
     showToast('Vui lòng chọn BU trước', 'error');
     return;
@@ -2286,8 +2223,8 @@ async function runDiagnostic() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         bu: bu,
-        week: wrWeek,
-        month: wrMonth,
+        week: apWeek,
+        month: apMonth,
         wr_rows: wrRows.map(r => ({
           kpi: r.kpi || '',
           target: r.target || '',
@@ -3292,8 +3229,8 @@ async function askMiMiFor(questionId, questionContent) {
 
   // Truyền BU + month + week để MiMi trích xuất dữ liệu nội bộ
   const bu = (state.cm && state.cm.bu) ? state.cm.bu : '';
-  const month = (state.cm && state.cm.wrMonth) ? state.cm.wrMonth : (state.dashboard && state.dashboard.month) || '';
-  const week = (state.cm && state.cm.wrWeek) ? state.cm.wrWeek : (state.dashboard && state.dashboard.week) || '';
+  const month = (state.cm && state.cm.apMonth) ? state.cm.apMonth : (state.dashboard && state.dashboard.month) || '';
+  const week = (state.cm && state.cm.apWeek) ? state.cm.apWeek : (state.dashboard && state.dashboard.week) || '';
 
   try {
     const result = await qaPost({
@@ -3563,7 +3500,7 @@ async function loadFMNotesSummary() {
 
 /** Tải và hiển thị tất cả FM Notes cho CM */
 async function loadCMFMNote() {
-  const { bu, wrMonth, wrWeek } = state.cm;
+  const { bu, apMonth, apWeek } = state.cm;
   if (!bu) return;
 
   const section = document.getElementById('cm-fm-note-section');
@@ -3575,7 +3512,7 @@ async function loadCMFMNote() {
   }
 
   try {
-    const result = await apiFetch('get_fm_note', { bu, month: wrMonth, week: wrWeek });
+    const result = await apiFetch('get_fm_note', { bu, month: apMonth, week: apWeek });
     state.cm.fmNotes = (result && result.notes) ? result.notes : [];
 
     if (!result || !result.notes || !result.notes.length) {
@@ -3595,7 +3532,7 @@ async function loadCMFMNote() {
 
 /** CM đánh dấu tất cả đã đọc */
 async function markFMNoteRead() {
-  const { bu, wrMonth, wrWeek } = state.cm;
+  const { bu, apMonth, apWeek } = state.cm;
   if (!bu) return;
 
   if (!isConfigured()) {
@@ -3604,7 +3541,7 @@ async function markFMNoteRead() {
   }
 
   try {
-    const result = await apiFetch('mark_fm_note_read', { bu, month: wrMonth, week: wrWeek });
+    const result = await apiFetch('mark_fm_note_read', { bu, month: apMonth, week: apWeek });
     if (result.success) {
       showToast(`✓ Đã xác nhận ${result.marked || 'tất cả'} ghi chú FM`);
       await loadCMFMNote();
@@ -3618,11 +3555,11 @@ async function markFMNoteRead() {
 
 /** CM đánh dấu 1 note cụ thể đã đọc */
 async function markFMNoteReadSingle(noteId) {
-  const { bu, wrMonth, wrWeek } = state.cm;
+  const { bu, apMonth, apWeek } = state.cm;
   if (!bu) return;
 
   try {
-    const result = await apiFetch('mark_fm_note_read', { bu, month: wrMonth, week: wrWeek, note_id: noteId });
+    const result = await apiFetch('mark_fm_note_read', { bu, month: apMonth, week: apWeek, note_id: noteId });
     if (result.success) {
       showToast('✓ Đã xác nhận ghi chú');
       await loadCMFMNote();
@@ -3982,54 +3919,31 @@ async function runTrainingAnalysis() {
     // Preload config for this month
     await preloadConfigForMonth(month);
 
-    // CM lưu AP cho "tuần hiện tại" nhưng WR cho "tuần trước".
-    // Ví dụ: WR W1 → AP nằm ở W2 cùng tháng. WR W4 → AP nằm ở W1 tháng sau.
-    // Cần fetch AP từ period tương ứng cho mỗi tuần WR.
+    // AP được lưu trực tiếp theo month/week tương ứng.
+    // Fetch 4 tuần AP trong tháng.
     const [y, mo] = month.split('-');
-    const nextMo = getNextMonth(parseInt(y), parseInt(mo));
-    const nextMonth = fmtMonth(nextMo.year, nextMo.month);
 
-    // Fetch 5 all_data song song:
-    // 4 tuần WR trong tháng + W1 tháng sau (chứa AP của WR W4)
-    const [w1, w2, w3, w4, nextW1] = await Promise.all([
+    const [w1, w2, w3, w4] = await Promise.all([
       apiFetch('all_data', { month, week: 1 }),
       apiFetch('all_data', { month, week: 2 }),
       apiFetch('all_data', { month, week: 3 }),
-      apiFetch('all_data', { month, week: 4 }),
-      apiFetch('all_data', { month: nextMonth, week: 1 })
+      apiFetch('all_data', { month, week: 4 })
     ]);
 
-    // weekData[i] = { wr: data_cho_WR, ap: data_cho_AP }
-    // WR W1 → AP ở W2 cùng tháng
-    // WR W2 → AP ở W3 cùng tháng
-    // WR W3 → AP ở W4 cùng tháng
-    // WR W4 → AP ở W1 tháng sau
-    const weekPairs = [
-      { wr: w1, ap: w2 },
-      { wr: w2, ap: w3 },
-      { wr: w3, ap: w4 },
-      { wr: w4, ap: nextW1 }
-    ];
+    const weekDataList = [w1, w2, w3, w4];
 
-    // Gộp dữ liệu 4 tuần: merge AP + WR rows và đếm tuần submitted
+    // Gộp dữ liệu 4 tuần: merge AP rows và đếm tuần submitted
     const mergedData = {};
     BU_LIST.forEach(bu => {
       mergedData[bu] = { AP: [], WR: [], weeksWithAP: 0, weeksWithWR: 0 };
     });
 
-    weekPairs.forEach(pair => {
+    weekDataList.forEach(weekData => {
       BU_LIST.forEach(bu => {
-        const wrBU = pair.wr[bu] || { AP: [], WR: [] };
-        const apBU = pair.ap[bu] || { AP: [], WR: [] };
+        const buData = weekData[bu] || { AP: [], WR: [] };
 
-        // WR từ WR-period
-        if (wrBU.WR && wrBU.WR.length > 0) {
-          mergedData[bu].WR = mergedData[bu].WR.concat(wrBU.WR);
-          mergedData[bu].weeksWithWR++;
-        }
-        // AP từ AP-period (tuần tiếp theo)
-        if (apBU.AP && apBU.AP.length > 0) {
-          mergedData[bu].AP = mergedData[bu].AP.concat(apBU.AP);
+        if (buData.AP && buData.AP.length > 0) {
+          mergedData[bu].AP = mergedData[bu].AP.concat(buData.AP);
           mergedData[bu].weeksWithAP++;
         }
       });
