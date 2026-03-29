@@ -105,6 +105,22 @@ const DEFAULT_DAILY_FIELDS = [
   { id: 'note',           label: 'Ghi chú',                group: 'TOTAL', type: 'text', role: 'note' }
 ];
 
+// ===================== DEFAULT BENCHMARKS =====================
+
+const DEFAULT_BENCHMARKS = {
+  fields: {
+    lead_mkt: 0, calls_n1: 15, trial_book: 5, trial_mkt: 0, deal_n1: 0, revenue_n1: 0,
+    calls_cskh: 10, deal_reupsell: 0, lead_referral: 0, deal_referral: 0, revenue_n2: 0,
+    lead_n3: 0, calls_n3: 5, direct_sales: 2, trial_book_n3: 0, trial_n3: 0, deal_n3: 0, revenue_n3: 0
+  },
+  cr: {
+    N1: { cr16: 15, cr46: 50, aov: 18 },
+    N2: { cr26_refer: 5, aov: 15 },
+    N3: { cr16: 10, cr46: 40, aov: 16 },
+    blended: { cr16: 15, cr46: 50, aov: 18 }
+  }
+};
+
 // ===================== DYNAMIC DAILY FIELDS HELPERS =====================
 
 /** Returns active daily fields: config daily_fields if loaded, else DEFAULT_DAILY_FIELDS.
@@ -4059,10 +4075,14 @@ const CONFIG_DEFAULTS = {
     list: WR_DEFAULT_ROWS.map(r => r.kpi)
   },
   benchmarks: {
+    // Legacy flat keys (for backward compat with bm. usage)
     cr16: 15, cr46: 50, aov: 18,
     cr16_n1: 15, cr46_n1: 50, aov_n1: 18, noshow: 20,
     cr_reupsell: 15, cr_referral: 5, aov_n2: 15,
-    cr16_n3: 10, cr46_n3: 40, aov_n3: 16
+    cr16_n3: 10, cr46_n3: 40, aov_n3: 16,
+    // New structured format
+    fields: JSON.parse(JSON.stringify(DEFAULT_BENCHMARKS.fields)),
+    cr: JSON.parse(JSON.stringify(DEFAULT_BENCHMARKS.cr))
   },
   week_pace: {
     w1: 0.15,
@@ -4080,10 +4100,151 @@ const CONFIG_DEFAULTS = {
   }
 };
 
+// ===================== BENCHMARK HELPERS =====================
+
+/** Get per-field benchmark (daily target) from config, fallback to DEFAULT_BENCHMARKS */
+function getBenchmark(fieldId) {
+  const cfg = state.config.data;
+  if (cfg && cfg.benchmarks && cfg.benchmarks.fields && cfg.benchmarks.fields[fieldId] !== undefined) {
+    return cfg.benchmarks.fields[fieldId];
+  }
+  return DEFAULT_BENCHMARKS.fields[fieldId] !== undefined ? DEFAULT_BENCHMARKS.fields[fieldId] : 0;
+}
+
+/** Get CR benchmark for a group/metric from config, fallback to DEFAULT_BENCHMARKS
+ *  @param {string} group - 'N1', 'N2', 'N3', or 'blended'
+ *  @param {string} metric - 'cr16', 'cr46', 'aov', 'cr26_refer'
+ */
+function getCRBenchmark(group, metric) {
+  const cfg = state.config.data;
+  if (cfg && cfg.benchmarks && cfg.benchmarks.cr && cfg.benchmarks.cr[group]) {
+    const val = cfg.benchmarks.cr[group][metric];
+    if (val !== undefined) return val;
+  }
+  return DEFAULT_BENCHMARKS.cr[group] ? DEFAULT_BENCHMARKS.cr[group][metric] : null;
+}
+
 /** Toggle config section accordion */
 function toggleConfigSection(headerEl) {
   const section = headerEl.parentElement;
   section.classList.toggle('open');
+}
+
+// ===================== BENCHMARK EDITOR =====================
+
+/**
+ * Render dynamic benchmark editor inside #cfg-benchmarks-editor.
+ * Generates inputs from getDailyFields() grouped by N1/N2/N3, plus CR benchmarks.
+ */
+function renderBenchmarkEditor() {
+  const container = document.getElementById('cfg-benchmarks-editor');
+  if (!container) return;
+
+  const fields = getDailyFields();
+  const cfg = state.config.data;
+  const bFields = (cfg && cfg.benchmarks && cfg.benchmarks.fields) ? cfg.benchmarks.fields : DEFAULT_BENCHMARKS.fields;
+  const bCR = (cfg && cfg.benchmarks && cfg.benchmarks.cr) ? cfg.benchmarks.cr : DEFAULT_BENCHMARKS.cr;
+
+  const groupMeta = [
+    { id: 'N1', label: 'N1 — Optimize (MKT)', color: 'var(--red)',
+      crInputs: [
+        { id: 'cfg-bench-cr16-N1', label: 'CR16 N1 (%)', key: 'cr16', step: '0.1', ph: '15', val: bCR.N1?.cr16 },
+        { id: 'cfg-bench-cr46-N1', label: 'CR46 N1 (%)', key: 'cr46', step: '0.1', ph: '50', val: bCR.N1?.cr46 },
+        { id: 'cfg-bench-aov-N1',  label: 'AOV N1 (triệu)', key: 'aov', step: '0.1', ph: '18', val: bCR.N1?.aov }
+      ]
+    },
+    { id: 'N2', label: 'N2 — Ops (Re/Upsell & Referral)', color: 'var(--blue)',
+      crInputs: [
+        { id: 'cfg-bench-cr26_refer-N2', label: 'CR26 Refer (%)', key: 'cr26_refer', step: '0.1', ph: '5',  val: bCR.N2?.cr26_refer },
+        { id: 'cfg-bench-aov-N2',        label: 'AOV N2 (triệu)', key: 'aov', step: '0.1', ph: '15', val: bCR.N2?.aov }
+      ]
+    },
+    { id: 'N3', label: 'N3 — Growth (Direct Sales)', color: 'var(--green)',
+      crInputs: [
+        { id: 'cfg-bench-cr16-N3', label: 'CR16 N3 (%)', key: 'cr16', step: '0.1', ph: '10', val: bCR.N3?.cr16 },
+        { id: 'cfg-bench-cr46-N3', label: 'CR46 N3 (%)', key: 'cr46', step: '0.1', ph: '40', val: bCR.N3?.cr46 },
+        { id: 'cfg-bench-aov-N3',  label: 'AOV N3 (triệu)', key: 'aov', step: '0.1', ph: '16', val: bCR.N3?.aov }
+      ]
+    }
+  ];
+
+  let html = '';
+
+  // ========== PHẦN 1: KPI MỤC TIÊU ==========
+  html += `<div class="bench-section-header">
+    <span class="bench-section-icon">🎯</span>
+    <div>
+      <div class="bench-section-title">KPI Mục tiêu</div>
+      <div class="bench-section-desc">Mục tiêu hàng ngày/tháng cho từng chỉ số. Dùng để đánh giá hiệu suất CM.</div>
+    </div>
+  </div>`;
+
+  groupMeta.forEach(grp => {
+    const grpFields = fields.filter(f => f.group === grp.id && f.role !== 'note');
+    html += `<div class="bench-group">
+      <div class="config-subsection-label" style="color:${grp.color}">${grp.label}</div>
+      <div class="config-grid bench-fields-grid">`;
+
+    grpFields.forEach(f => {
+      const isRev = f.role === 'revenue';
+      const unitLabel = isRev ? 'triệu/tháng' : 'số/ngày';
+      const step = isRev ? '0.1' : '1';
+      const curVal = bFields[f.id] !== undefined ? bFields[f.id] : (DEFAULT_BENCHMARKS.fields[f.id] || 0);
+      html += `<div class="config-field">
+        <label>${f.label}<span class="bench-unit">${unitLabel}</span></label>
+        <input type="number" id="cfg-bench-field-${f.id}" step="${step}" min="0" placeholder="0" value="${curVal}">
+      </div>`;
+    });
+
+    html += `</div></div>`; // end config-grid + bench-group
+  });
+
+  // ========== PHẦN 2: BENCHMARK (CR, AOV) ==========
+  html += `<div class="bench-section-header" style="margin-top:24px">
+    <span class="bench-section-icon">📊</span>
+    <div>
+      <div class="bench-section-title">Benchmark (CR, AOV)</div>
+      <div class="bench-section-desc">Ngưỡng đánh giá tỷ lệ chuyển đổi và giá trị trung bình. Xanh/Vàng/Đỏ trên Dashboard.</div>
+    </div>
+  </div>`;
+
+  groupMeta.forEach(grp => {
+    html += `<div class="bench-group">
+      <div class="config-subsection-label" style="color:${grp.color}">${grp.label}</div>
+      <div class="config-grid">`;
+
+    grp.crInputs.forEach(cr => {
+      const v = cr.val !== undefined ? cr.val : cr.ph;
+      html += `<div class="config-field">
+        <label>${cr.label}</label>
+        <input type="number" id="${cr.id}" step="${cr.step}" min="0" placeholder="${cr.ph}" value="${v}">
+      </div>`;
+    });
+
+    html += `</div></div>`; // end config-grid + bench-group
+  });
+
+  // Blended section
+  html += `<div class="bench-group bench-blended">
+    <div class="config-subsection-label">Blended (tổng hợp)</div>
+    <div class="config-grid">
+      <div class="config-field">
+        <label>CR16 Blended (%)</label>
+        <input type="number" id="cfg-bench-cr16-blended" step="0.1" min="0" placeholder="15" value="${bCR.blended?.cr16 !== undefined ? bCR.blended.cr16 : 15}">
+      </div>
+      <div class="config-field">
+        <label>CR46 Blended (%)</label>
+        <input type="number" id="cfg-bench-cr46-blended" step="0.1" min="0" placeholder="50" value="${bCR.blended?.cr46 !== undefined ? bCR.blended.cr46 : 50}">
+      </div>
+      <div class="config-field">
+        <label>AOV Blended (triệu)</label>
+        <input type="number" id="cfg-bench-aov-blended" step="0.1" min="0" placeholder="18" value="${bCR.blended?.aov !== undefined ? bCR.blended.aov : 18}">
+      </div>
+    </div>
+    <div class="config-hint">Benchmark Blended dùng cho KPI cards tổng. Benchmark N1/N2/N3 dùng cho CR strip từng nguồn.</div>
+  </div>`;
+
+  container.innerHTML = html;
 }
 
 /** Initialize Config view when navigated to */
@@ -4232,30 +4393,8 @@ function populateConfigUI() {
     renderDailyFieldsEditor(DEFAULT_DAILY_FIELDS);
   }
 
-  // KPI list
-  const kpiTA = document.getElementById('cfg-kpi-list');
-  if (kpiTA) {
-    const kpis = d.kpi_list && d.kpi_list.list ? d.kpi_list.list : CONFIG_DEFAULTS.kpi_list.list;
-    kpiTA.value = (Array.isArray(kpis) ? kpis : []).join('\n');
-  }
-
-  // Benchmarks — Blended
-  setVal('cfg-bench-cr16', getNestedVal(d, 'benchmarks', 'cr16', CONFIG_DEFAULTS.benchmarks.cr16));
-  setVal('cfg-bench-cr46', getNestedVal(d, 'benchmarks', 'cr46', CONFIG_DEFAULTS.benchmarks.cr46));
-  setVal('cfg-bench-aov', getNestedVal(d, 'benchmarks', 'aov', CONFIG_DEFAULTS.benchmarks.aov));
-  // Benchmarks — N1
-  setVal('cfg-bench-cr16-n1', getNestedVal(d, 'benchmarks', 'cr16_n1', CONFIG_DEFAULTS.benchmarks.cr16_n1));
-  setVal('cfg-bench-cr46-n1', getNestedVal(d, 'benchmarks', 'cr46_n1', CONFIG_DEFAULTS.benchmarks.cr46_n1));
-  setVal('cfg-bench-aov-n1', getNestedVal(d, 'benchmarks', 'aov_n1', CONFIG_DEFAULTS.benchmarks.aov_n1));
-  setVal('cfg-bench-noshow', getNestedVal(d, 'benchmarks', 'noshow', CONFIG_DEFAULTS.benchmarks.noshow));
-  // Benchmarks — N2
-  setVal('cfg-bench-cr-reupsell', getNestedVal(d, 'benchmarks', 'cr_reupsell', CONFIG_DEFAULTS.benchmarks.cr_reupsell));
-  setVal('cfg-bench-cr-referral', getNestedVal(d, 'benchmarks', 'cr_referral', CONFIG_DEFAULTS.benchmarks.cr_referral));
-  setVal('cfg-bench-aov-n2', getNestedVal(d, 'benchmarks', 'aov_n2', CONFIG_DEFAULTS.benchmarks.aov_n2));
-  // Benchmarks — N3
-  setVal('cfg-bench-cr16-n3', getNestedVal(d, 'benchmarks', 'cr16_n3', CONFIG_DEFAULTS.benchmarks.cr16_n3));
-  setVal('cfg-bench-cr46-n3', getNestedVal(d, 'benchmarks', 'cr46_n3', CONFIG_DEFAULTS.benchmarks.cr46_n3));
-  setVal('cfg-bench-aov-n3', getNestedVal(d, 'benchmarks', 'aov_n3', CONFIG_DEFAULTS.benchmarks.aov_n3));
+  // Dynamic benchmark editor (replaces static hardcoded inputs)
+  renderBenchmarkEditor();
 
   // Week Pace
   setVal('cfg-pace-w1', getNestedVal(d, 'week_pace', 'w1', CONFIG_DEFAULTS.week_pace.w1));
@@ -4298,26 +4437,62 @@ function readConfigFromUI() {
   // Daily fields
   config.daily_fields = { list: readDailyFieldsFromEditor() };
 
-  // KPI list
+  // KPI list (kept for backward compat; textarea removed from UI but still stored)
   const kpiTA = document.getElementById('cfg-kpi-list');
   const kpiLines = kpiTA ? kpiTA.value.split('\n').map(l => l.trim()).filter(l => l) : [];
   config.kpi_list = { list: kpiLines };
 
-  // Benchmarks
+  // Benchmarks — dynamic, read from rendered editor
+  const fields = getDailyFields();
+  const benchFields = {};
+  fields.forEach(f => {
+    if (f.role === 'note') return;
+    const el = document.getElementById('cfg-bench-field-' + f.id);
+    benchFields[f.id] = el ? (parseFloat(el.value) || 0) : (DEFAULT_BENCHMARKS.fields[f.id] || 0);
+  });
+
+  const _cr = (id, def) => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || def) : def; };
+
+  const benchCR = {
+    N1: {
+      cr16: _cr('cfg-bench-cr16-N1', DEFAULT_BENCHMARKS.cr.N1.cr16),
+      cr46: _cr('cfg-bench-cr46-N1', DEFAULT_BENCHMARKS.cr.N1.cr46),
+      aov:  _cr('cfg-bench-aov-N1',  DEFAULT_BENCHMARKS.cr.N1.aov)
+    },
+    N2: {
+      cr26_refer: _cr('cfg-bench-cr26_refer-N2', DEFAULT_BENCHMARKS.cr.N2.cr26_refer),
+      aov: _cr('cfg-bench-aov-N2', DEFAULT_BENCHMARKS.cr.N2.aov)
+    },
+    N3: {
+      cr16: _cr('cfg-bench-cr16-N3', DEFAULT_BENCHMARKS.cr.N3.cr16),
+      cr46: _cr('cfg-bench-cr46-N3', DEFAULT_BENCHMARKS.cr.N3.cr46),
+      aov:  _cr('cfg-bench-aov-N3',  DEFAULT_BENCHMARKS.cr.N3.aov)
+    },
+    blended: {
+      cr16: _cr('cfg-bench-cr16-blended', DEFAULT_BENCHMARKS.cr.blended.cr16),
+      cr46: _cr('cfg-bench-cr46-blended', DEFAULT_BENCHMARKS.cr.blended.cr46),
+      aov:  _cr('cfg-bench-aov-blended',  DEFAULT_BENCHMARKS.cr.blended.aov)
+    }
+  };
+
   config.benchmarks = {
-    cr16: parseFloat(document.getElementById('cfg-bench-cr16')?.value) || 15,
-    cr46: parseFloat(document.getElementById('cfg-bench-cr46')?.value) || 50,
-    aov: parseFloat(document.getElementById('cfg-bench-aov')?.value) || 18,
-    cr16_n1: parseFloat(document.getElementById('cfg-bench-cr16-n1')?.value) || 15,
-    cr46_n1: parseFloat(document.getElementById('cfg-bench-cr46-n1')?.value) || 50,
-    aov_n1: parseFloat(document.getElementById('cfg-bench-aov-n1')?.value) || 18,
-    noshow: parseFloat(document.getElementById('cfg-bench-noshow')?.value) || 20,
-    cr_reupsell: parseFloat(document.getElementById('cfg-bench-cr-reupsell')?.value) || 15,
-    cr_referral: parseFloat(document.getElementById('cfg-bench-cr-referral')?.value) || 5,
-    aov_n2: parseFloat(document.getElementById('cfg-bench-aov-n2')?.value) || 15,
-    cr16_n3: parseFloat(document.getElementById('cfg-bench-cr16-n3')?.value) || 10,
-    cr46_n3: parseFloat(document.getElementById('cfg-bench-cr46-n3')?.value) || 40,
-    aov_n3: parseFloat(document.getElementById('cfg-bench-aov-n3')?.value) || 16
+    // New structured format
+    fields: benchFields,
+    cr: benchCR,
+    // Legacy flat keys — kept for backward compat with bm. usage elsewhere
+    cr16: benchCR.blended.cr16,
+    cr46: benchCR.blended.cr46,
+    aov: benchCR.blended.aov,
+    cr16_n1: benchCR.N1.cr16,
+    cr46_n1: benchCR.N1.cr46,
+    aov_n1: benchCR.N1.aov,
+    noshow: 20,
+    cr_reupsell: 15,
+    cr_referral: benchCR.N2.cr26_refer,
+    aov_n2: benchCR.N2.aov,
+    cr16_n3: benchCR.N3.cr16,
+    cr46_n3: benchCR.N3.cr46,
+    aov_n3: benchCR.N3.aov
   };
 
   // Week Pace
@@ -5547,13 +5722,16 @@ function renderDailyOps() {
     if (group === 'N1') {
       // N1: CR16 = Deal/Lead, CR46 = Deal/Trial (trial_mkt hoặc trial_book nếu trial_mkt=0)
       const cr46Val = gCR.cr46 || 0;
+      const bmCR16n1 = getCRBenchmark('N1', 'cr16') || 15;
+      const bmCR46n1 = getCRBenchmark('N1', 'cr46') || 50;
+      const bmAOVn1  = getCRBenchmark('N1', 'aov')  || 18;
       crChips = [
         { label: 'CR16 (N1)', value: gCR.cr16 || 0, rawPrev: pCR ? pCR.cr16 : null,
-          bench: 15, benchLabel: 'BM: 15%' },
+          bench: bmCR16n1, benchLabel: `BM: ${bmCR16n1}%` },
         { label: 'CR46 (N1)', value: cr46Val, rawPrev: pCR ? pCR.cr46 : null,
-          bench: 50, benchLabel: 'BM: 50%' },
+          bench: bmCR46n1, benchLabel: `BM: ${bmCR46n1}%` },
         { label: 'AOV (N1)', value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
-          suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
+          suffix: 'AOV', bench: bmAOVn1, benchLabel: `BM: ${bmAOVn1}M` }
       ];
     } else if (group === 'N2') {
       // N2: Chỉ CR26 Refer = L6 Referral / L2 Referral + AOV
@@ -5563,21 +5741,26 @@ function renderDailyOps() {
       const prevL2ref = prev ? (prev.raw[fields.find(f => f.group === 'N2' && f.role === 'referral_lead')?.id] || 0) : 0;
       const prevL6ref = prev ? (prev.cleanDealsByField['deal_referral'] || 0) : 0;
       const prevCr26 = prevL2ref > 0 ? (prevL6ref / prevL2ref * 100) : 0;
+      const bmCR26n2 = getCRBenchmark('N2', 'cr26_refer') || 5;
+      const bmAOVn2  = getCRBenchmark('N2', 'aov') || 15;
       crChips = [
         { label: 'CR26 Refer', value: cr26, rawPrev: prev ? prevCr26 : null,
-          bench: null },
+          bench: bmCR26n2, benchLabel: `BM: ${bmCR26n2}%` },
         { label: 'AOV (N2)', value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
-          suffix: 'AOV', bench: null }
+          suffix: 'AOV', bench: bmAOVn2, benchLabel: `BM: ${bmAOVn2}M` }
       ];
     } else if (group === 'N3') {
       // N3: CR16, CR46, AOV
+      const bmCR16n3 = getCRBenchmark('N3', 'cr16') || 10;
+      const bmCR46n3 = getCRBenchmark('N3', 'cr46') || 40;
+      const bmAOVn3  = getCRBenchmark('N3', 'aov')  || 16;
       crChips = [
         { label: 'CR16 (N3)', value: gCR.cr16 || 0, rawPrev: pCR ? pCR.cr16 : null,
-          bench: 15, benchLabel: 'BM: 15%' },
+          bench: bmCR16n3, benchLabel: `BM: ${bmCR16n3}%` },
         { label: 'CR46 (N3)', value: gCR.cr46 || 0, rawPrev: pCR ? pCR.cr46 : null,
-          bench: 50, benchLabel: 'BM: 50%' },
+          bench: bmCR46n3, benchLabel: `BM: ${bmCR46n3}%` },
         { label: 'AOV (N3)', value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
-          suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
+          suffix: 'AOV', bench: bmAOVn3, benchLabel: `BM: ${bmAOVn3}M` }
       ];
     }
     renderCRStrip(`dops-cr-${group.toLowerCase()}`, crChips);
@@ -5884,7 +6067,12 @@ function renderCMAnalytics() {
   const n3_rev = _sum(filtered, 'revenue_n3');
   const n3_calls_avg = n3_calls / avgDays;
 
-  const WM_BENCH = { calls_n1: 15, trial_mkt: 3, calls_cskh: 10, calls_n3: 5 };
+  const WM_BENCH = {
+    calls_n1:  getBenchmark('calls_n1')  || 15,
+    trial_mkt: getBenchmark('trial_mkt') || 3,
+    calls_cskh: getBenchmark('calls_cskh') || 10,
+    calls_n3:  getBenchmark('calls_n3')  || 5
+  };
 
   function cmWmRow(label, total, avgPerDay, bench, unit) {
     const pct = bench > 0 ? Math.min(avgPerDay / bench * 100, 150) : 0;
@@ -6508,7 +6696,14 @@ function _barColor(val, good, warn) {
 // Helper: compute per-BU stats for comparison tables
 // ============================================================
 function _computeBUStats(data, uniqueBUs) {
-  const WM_BENCH = { calls_n1: 15, trial_book: 5, trial_mkt: 3, calls_cskh: 10, calls_n3: 5, direct_sales: 2 };
+  const WM_BENCH = {
+    calls_n1:   getBenchmark('calls_n1')   || 15,
+    trial_book: getBenchmark('trial_book') || 5,
+    trial_mkt:  getBenchmark('trial_mkt')  || 3,
+    calls_cskh: getBenchmark('calls_cskh') || 10,
+    calls_n3:   getBenchmark('calls_n3')   || 5,
+    direct_sales: getBenchmark('direct_sales') || 2
+  };
   return uniqueBUs.map(bu => {
     const rows = data.filter(r => r.bu === bu);
     const days = [...new Set(rows.map(r => r.date))].length || 1;
@@ -6603,7 +6798,12 @@ function renderAnalytics() {
   const n3_rev = _sum(filtered, 'revenue_n3');
   const n3_calls_avg = buCount > 0 ? (n3_calls / buCount / avgDays) : 0;
 
-  const WM_BENCH = { calls_n1: 15, trial_mkt: 3, calls_cskh: 10, calls_n3: 5 };
+  const WM_BENCH = {
+    calls_n1:  getBenchmark('calls_n1')  || 15,
+    trial_mkt: getBenchmark('trial_mkt') || 3,
+    calls_cskh: getBenchmark('calls_cskh') || 10,
+    calls_n3:  getBenchmark('calls_n3')  || 5
+  };
 
   function wmRow(label, total, avgPerDay, bench, unit) {
     const pct = bench > 0 ? Math.min(avgPerDay / bench * 100, 150) : 0;

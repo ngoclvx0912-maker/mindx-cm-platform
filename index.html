@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css?v=dops4">
+  <link rel="stylesheet" href="./style.css?v=bench2">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -974,21 +974,6 @@
       </div>
     </div>
 
-    <!-- Section 1b: KPI List (legacy) -->
-    <div class="config-section">
-      <div class="config-section-header" onclick="toggleConfigSection(this)">
-        <div class="config-section-title">
-          <span class="config-section-icon">📝</span>
-          Danh sách KPI (WR)
-        </div>
-        <span class="config-section-toggle">▼</span>
-      </div>
-      <div class="config-section-body">
-        <p class="config-section-desc">Danh sách các KPI trong Weekly Report. Mỗi dòng 1 chỉ số.</p>
-        <textarea id="cfg-kpi-list" class="config-textarea" rows="10" placeholder="Mỗi dòng là 1 chỉ số..."></textarea>
-      </div>
-    </div>
-
     <!-- Section 2: Benchmarks -->
     <div class="config-section">
       <div class="config-section-header" onclick="toggleConfigSection(this)">
@@ -1000,75 +985,9 @@
       </div>
       <div class="config-section-body">
         <p class="config-section-desc">Các ngưỡng benchmark theo từng nguồn. Dashboard sẽ dùng các giá trị này để đánh giá hiệu suất (xanh/vàng/đỏ).</p>
-
-        <div class="config-subsection-label" style="color:var(--red)">N1 — Optimize (MKT)</div>
-        <div class="config-grid">
-          <div class="config-field">
-            <label>CR16 N1 (%)</label>
-            <input type="number" id="cfg-bench-cr16-n1" step="0.01" placeholder="15">
-          </div>
-          <div class="config-field">
-            <label>CR46 N1 (%)</label>
-            <input type="number" id="cfg-bench-cr46-n1" step="0.01" placeholder="50">
-          </div>
-          <div class="config-field">
-            <label>AOV N1 (triệu)</label>
-            <input type="number" id="cfg-bench-aov-n1" step="0.1" placeholder="18">
-          </div>
-          <div class="config-field">
-            <label>No-show (%)</label>
-            <input type="number" id="cfg-bench-noshow" step="0.01" placeholder="20">
-          </div>
+        <div id="cfg-benchmarks-editor">
+          <!-- Will be populated dynamically by JS -->
         </div>
-
-        <div class="config-subsection-label" style="color:var(--blue)">N2 — Ops (Re/Upsell & Referral)</div>
-        <div class="config-grid">
-          <div class="config-field">
-            <label>CR Re/Upsell (%)</label>
-            <input type="number" id="cfg-bench-cr-reupsell" step="0.01" placeholder="15">
-          </div>
-          <div class="config-field">
-            <label>CR Referral (%)</label>
-            <input type="number" id="cfg-bench-cr-referral" step="0.01" placeholder="5">
-          </div>
-          <div class="config-field">
-            <label>AOV N2 (triệu)</label>
-            <input type="number" id="cfg-bench-aov-n2" step="0.1" placeholder="15">
-          </div>
-        </div>
-
-        <div class="config-subsection-label" style="color:var(--green)">N3 — Growth (Direct Sales)</div>
-        <div class="config-grid">
-          <div class="config-field">
-            <label>CR16 N3 (%)</label>
-            <input type="number" id="cfg-bench-cr16-n3" step="0.01" placeholder="10">
-          </div>
-          <div class="config-field">
-            <label>CR46 N3 (%)</label>
-            <input type="number" id="cfg-bench-cr46-n3" step="0.01" placeholder="40">
-          </div>
-          <div class="config-field">
-            <label>AOV N3 (triệu)</label>
-            <input type="number" id="cfg-bench-aov-n3" step="0.1" placeholder="16">
-          </div>
-        </div>
-
-        <div class="config-subsection-label">Blended (tổng hợp)</div>
-        <div class="config-grid">
-          <div class="config-field">
-            <label>CR16 Blended (%)</label>
-            <input type="number" id="cfg-bench-cr16" step="0.01" placeholder="15">
-          </div>
-          <div class="config-field">
-            <label>CR46 Blended (%)</label>
-            <input type="number" id="cfg-bench-cr46" step="0.01" placeholder="50">
-          </div>
-          <div class="config-field">
-            <label>AOV Blended (triệu)</label>
-            <input type="number" id="cfg-bench-aov" step="0.1" placeholder="18">
-          </div>
-        </div>
-        <div class="config-hint">Benchmark Blended dùng cho KPI cards tổng. Benchmark N1/N2/N3 dùng cho CR strip từng nguồn.</div>
       </div>
     </div>
 
@@ -1422,6 +1341,6 @@
   </div>
 </div>
 
-<script src="./app.js?v=dops4"></script>
+<script src="./app.js?v=bench2"></script>
 </body>
 </html>
