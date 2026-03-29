@@ -643,15 +643,17 @@ function updateTrainingPeriodDisplay() {
 /**
  * Tính AP period tương ứng với WR period đã chọn.
  * CM lưu AP cho "tuần hiện tại" (= tuần tiếp theo của WR).
- * VD: WR = 2026-02 W4 → AP = 2026-03 W1
- *     WR = 2026-03 W2 → AP = 2026-03 W3
+ * VD: WR = 2026-02 W4 → AP = 2026-03 W2 (currentWeek=W1, AP=W1+1=W2? No...)
+ * Thực tế: WR = W1 → AP = W3, WR = W2 → AP = W4, WR = W3 → AP = T+1/W1
  */
 function getAPPeriodFromWR(wrMonth, wrWeek) {
+  // AP = WR + 2 (vì currentWeek = WR+1, AP = currentWeek+1 = WR+2)
   const w = parseInt(wrWeek);
-  if (w < 4) {
-    return { month: wrMonth, week: w + 1 };
+  const apWeek = w + 2;
+  if (apWeek <= 4) {
+    return { month: wrMonth, week: apWeek };
   } else {
-    // W4 → W1 tháng sau
+    // Vượt W4 → W1 tháng sau
     const [y, mo] = wrMonth.split('-');
     const next = getNextMonth(parseInt(y), parseInt(mo));
     return { month: fmtMonth(next.year, next.month), week: 1 };
@@ -1477,9 +1479,9 @@ async function runAnalysis() {
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải cấu hình...';
     await preloadConfigForMonth(month);
 
-    // Fetch AP data cho tuần tiếp theo (period hiện tại của CM)
+    // Fetch AP data — dùng getAPPeriodFromWR (đã fix: AP = WR+2)
     const apPeriod = getAPPeriodFromWR(month, week);
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải AP data...';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải AP (${apPeriod.month} W${apPeriod.week})...';
     const apData = await apiFetch('all_data', { month: apPeriod.month, week: apPeriod.week });
 
     // Build allData chỉ từ AP (không cần WR nữa)
