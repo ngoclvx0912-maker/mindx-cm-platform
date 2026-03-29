@@ -1477,34 +1477,19 @@ async function runAnalysis() {
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải cấu hình...';
     await preloadConfigForMonth(month);
 
-    // AP được CM lưu theo period "tuần hiện tại" (= tuần tiếp theo của WR).
+    // Fetch AP data cho tuần tiếp theo (period hiện tại của CM)
     const apPeriod = getAPPeriodFromWR(month, week);
-    const isSamePeriod = apPeriod.month === month && apPeriod.week === parseInt(week);
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải AP data...';
+    const apData = await apiFetch('all_data', { month: apPeriod.month, week: apPeriod.week });
 
-    let allData;
-    if (isSamePeriod) {
-      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải dữ liệu...';
-      allData = await apiFetch('all_data', { month, week });
-    } else {
-      // Fetch TUẦN TỰ (không song song) để giảm tải
-      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải WR data...';
-      const wrData = await apiFetch('all_data', { month, week });
-
-      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải AP data...';
-      const apData = await apiFetch('all_data', { month: apPeriod.month, week: apPeriod.week });
-
-      // Merge: lấy WR từ wrData, lấy AP từ apData
-      allData = {};
-      const allBUs = new Set([...Object.keys(wrData), ...Object.keys(apData)]);
-      allBUs.forEach(bu => {
-        const wr = wrData[bu] || { AP: [], WR: [] };
-        const ap = apData[bu] || { AP: [], WR: [] };
-        allData[bu] = {
-          AP: ap.AP || [],
-          WR: wr.WR || []
-        };
-      });
-    }
+    // Build allData chỉ từ AP (không cần WR nữa)
+    const allData = {};
+    Object.keys(apData).forEach(bu => {
+      allData[bu] = {
+        AP: (apData[bu] && apData[bu].AP) || [],
+        WR: []
+      };
+    });
 
     state.dashboard.allData = allData;
 
