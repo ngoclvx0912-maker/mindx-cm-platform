@@ -1688,105 +1688,36 @@ function openDetailPanel(bu) {
   const s = state.dashboard.scores.find(x => x.bu === bu);
   if (!s) return;
 
-  const rating = getRating(s.total);
-  const pct = Math.round(s.total / 100 * 100);
-
+  // Header: BU name + meta
   document.getElementById('detail-bu-name').textContent = s.bu;
   const funcInfo = state.dashboard.funcFilter !== 'ALL'
     ? ` · Function: ${state.dashboard.funcFilter}`
     : '';
   document.getElementById('detail-meta').textContent = `Vùng: ${s.region} · ${state.dashboard.month} · Tuần ${state.dashboard.week}${funcInfo}`;
-  document.getElementById('detail-ap-score').textContent = s.apScore;
-  document.getElementById('detail-wr-score').textContent = s.wrScore;
-  document.getElementById('detail-total-val').textContent = s.total;
 
-  const totalRatingEl = document.getElementById('detail-total-rating');
-  totalRatingEl.textContent = s.rating;
-  totalRatingEl.className = `rating-badge rating-${s.ratingCls}`;
-
-  const barFill = document.getElementById('detail-score-bar');
-  barFill.style.width = pct + '%';
-  barFill.className = `score-bar-fill ${s.ratingCls}`;
-
-  function renderBreakdown(containerId, breakdown) {
-    const el = document.getElementById(containerId);
-    if (!el) return;
-    el.innerHTML = Object.entries(breakdown).map(([k, v]) => `
-      <div class="detail-breakdown-item">
-        <span class="detail-breakdown-name">${escHtml(k)}</span>
-        <span class="detail-breakdown-score">${v} điểm</span>
-      </div>
-    `).join('');
-  }
-
-  renderBreakdown('detail-ap-breakdown', s.apBreakdown);
-  renderBreakdown('detail-wr-breakdown', s.wrBreakdown);
-
-  // ===== Section A: Sức khỏe doanh số =====
-  const healthBadgeEl = document.getElementById('detail-health-badge');
-  healthBadgeEl.innerHTML = `<span class="health-badge ${s.healthCls || 'health-xam'}"><span class="health-dot ${s.healthStatus || 'xam'}"></span>${escHtml(s.healthLabel || 'Chưa nộp WR')}</span>`;
-  if (s.revenuePct > 0) {
-    const paceLabel = s.pace ? `${Math.round(s.pace * 100)}%` : '';
-    healthBadgeEl.innerHTML += `
-      <span style="margin-left:10px;font-size:12px;color:var(--gray-600)">
-        % Đạt DS: <strong>${s.revenuePct}%</strong>
-        ${paceLabel ? `&nbsp;&middot;&nbsp; Pace kỳ vọng: <strong>${paceLabel}</strong>` : ''}
-      </span>
-    `;
-  }
-
-  // Bảng chi tiết doanh số
-  const healthTbody = document.getElementById('detail-health-tbody');
-  if (s.revenueRows && s.revenueRows.length > 0) {
-    const pace = s.pace || WEEK_PACE[state.dashboard.week || 1];
-    healthTbody.innerHTML = s.revenueRows.map(row => {
-      if (row.pct === null) {
-        return `<tr>
-          <td>${escHtml(row.kpi)}</td>
-          <td style="text-align:right;color:#aaa">—</td>
-          <td style="text-align:right;color:#aaa">—</td>
-          <td class="pct-cell" style="text-align:right;color:#aaa">—</td>
-          <td style="text-align:center;color:#aaa">—</td>
-        </tr>`;
-      }
-      const pctVal = Math.round(row.pct * 100);
-      let pctCls = 'good';
-      if (row.pct < pace * 0.5) pctCls = 'bad';
-      else if (row.pct < pace) pctCls = 'warn';
-      const icon = row.paceOk ? '<span style="color:#1a7a3a">✓</span>' : '<span style="color:#cc0000">✗</span>';
-      const expectedLabel = row.expectedPace !== undefined ? row.expectedPace.toLocaleString('vi-VN') : '—';
-      return `<tr>
-        <td>${escHtml(row.kpi)}</td>
-        <td style="text-align:right">${typeof row.target === 'number' ? row.target.toLocaleString('vi-VN') : escHtml(String(row.target||''))}</td>
-        <td style="text-align:right">${typeof row.actual === 'number' ? row.actual.toLocaleString('vi-VN') : escHtml(String(row.actual||''))}</td>
-        <td class="pct-cell ${pctCls}" style="text-align:right">${pctVal}%</td>
-        <td style="text-align:center">${icon} ${expectedLabel}</td>
-      </tr>`;
-    }).join('');
-  } else {
-    healthTbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#aaa;padding:12px;font-size:12px">Chưa có dữ liệu WR</td></tr>`;
-  }
-
-  // ===== Section C: Chi tiết Action Plan =====
+  // Chi tiết Action Plan
   renderAPDetailInPanel(bu);
 
-  // ===== Section D: AI phân tích =====
+  // AI phân tích (chỉ hiện khi có dữ liệu AP)
   const aiSection = document.getElementById('detail-ai-section');
   const aiContent = document.getElementById('detail-ai-content');
-  // Chỉ hiện cho BU Vàng hoặc Đỏ
-  if (s.healthStatus === 'vang' || s.healthStatus === 'do') {
-    aiSection.style.display = 'block';
-    // Reset nội dung AI khi chuyển BU
-    aiContent.innerHTML = '';
-    const aiBtn = document.getElementById('btn-ai-analyze');
-    if (aiBtn) {
-      aiBtn.disabled = false;
-      aiBtn.innerHTML = '🤖 Phân tích Action Plan bằng AI';
+  if (aiSection) {
+    const buData = state.dashboard.allData && state.dashboard.allData[bu];
+    const hasAP = buData && buData.AP && buData.AP.length > 0;
+    if (hasAP) {
+      aiSection.style.display = 'block';
+      if (aiContent) aiContent.innerHTML = '';
+      const aiBtn = document.getElementById('btn-ai-analyze');
+      if (aiBtn) {
+        aiBtn.disabled = false;
+        aiBtn.innerHTML = '🤖 Phân tích Action Plan bằng AI';
+      }
+    } else {
+      aiSection.style.display = 'none';
     }
-  } else {
-    aiSection.style.display = 'none';
   }
 
+  // Mở panel
   document.getElementById('detail-panel').classList.add('open');
   document.getElementById('panel-overlay').classList.add('show');
 
