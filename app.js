@@ -1860,6 +1860,8 @@ function closeDetailPanel() {
 }
 
 // ===================== AI ANALYSIS =====================
+const PPLX_API_KEY = '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';
+
 async function analyzeWithAI(bu) {
   const s = state.dashboard.scores.find(x => x.bu === bu);
   if (!s) return;
@@ -1867,43 +1869,97 @@ async function analyzeWithAI(bu) {
   const buData = state.dashboard.allData[bu] || { AP: [], WR: [] };
   const allData = state.dashboard.allData || {};
 
-  const aiSection = document.getElementById('detail-ai-section');
   const aiContent = document.getElementById('detail-ai-content');
   const aiBtn = document.getElementById('btn-ai-analyze');
 
-  // Show loading
   aiBtn.disabled = true;
   aiBtn.innerHTML = '<span class="ai-spinner"></span> Đang phân tích...';
-  aiContent.innerHTML = '<div class="ai-loading">Đang phân tích Action Plan bằng AI...<br><small style="color:#888">Truy xuất dữ liệu lịch sử + benchmark + best-practice BU Xanh...</small></div>';
+  aiContent.innerHTML = '<div class="ai-loading">Đang phân tích Action Plan bằng AI...<br><small style="color:#888">Gọi Perplexity AI (sonar-pro)...</small></div>';
 
-  // Thu thập AP mẫu từ BU Xanh trong allData (không cần backend fetch lại)
   const bestAps = collectBestAPs(allData, bu, state.dashboard.week);
+  const apRows = buData.AP || [];
+
+  // Build prompt
+  const apText = apRows.map((r, i) => {
+    return `Action ${i+1} [${r.func || ''}]:\n` +
+      `  Chỉ số: ${r.chi_so || '—'}\n` +
+      `  Vấn đề: ${r.van_de || '—'}\n` +
+      `  Mức độ: ${r.muc_do || '—'}\n` +
+      `  Root Cause: ${r.root_cause || '—'}\n` +
+      `  Key Action: ${r.key_action || '—'}\n` +
+      `  Triển khai: ${r.mo_ta_trien_khai || '—'}\n` +
+      `  Target: ${r.target_do_luong || '—'} | Deadline: ${r.deadline || '—'} | Owner: ${r.owner || '—'}\n` +
+      `  Status: ${r.status || 'Chưa cập nhật'}`;
+  }).join('\n\n');
+
+  let bestApText = '';
+  if (bestAps.length > 0) {
+    bestApText = '\n\nAP mẫu từ BU đạt chỉ tiêu (tham khảo):\n' + bestAps.map(b => {
+      return `BU ${b.bu}:\n` + b.aps.map(a =>
+        `  - [${a.func}] ${a.chi_so}: ${a.key_action}`
+      ).join('\n');
+    }).join('\n');
+  }
+
+  const systemPrompt = `Bạn là chuyên gia phân tích Action Plan cho trung tâm giáo dục MindX. 
+Phân tích từng action của CM và trả về JSON với format:
+{
+  "trend": "IMPROVING" | "DECLINING" | "STABLE" | "NO_DATA",
+  "trend_note": "mô tả ngắn",
+  "actions": [
+    {
+      "index": 1,
+      "verdict": "KHA_THI" | "CAN_DIEU_CHINH" | "KHONG_KHA_THI",
+      "reason": "lý do đánh giá",
+      "suggestion": "gợi ý cải thiện (nếu cần)"
+    }
+  ],
+  "summary": "khuyến nghị tổng hợp cho FM/SOD"
+}
+Chỉ trả về JSON, không giải thích thêm.`;
+
+  const userPrompt = `BU: ${bu}\nTháng: ${state.dashboard.month} | Tuần: ${state.dashboard.week}\n\n${apText}${bestApText}`;
 
   try {
-    const response = await fetch(`${CGI_BIN}/ai-analyze.py`, {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${PPLX_API_KEY}`
+      },
       body: JSON.stringify({
-        bu: bu,
-        week: state.dashboard.week,
-        month: state.dashboard.month,
-        ap_rows: buData.AP || [],
-        wr_rows: buData.WR || [],
-        health_status: s.healthLabel || 'Chưa xác định',
-        best_aps: bestAps
-        // prev_wr_rows: backend sẽ tự fetch từ Google Sheets
+        model: 'sonar-pro',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 2000
       })
     });
 
-    const result = await response.json();
-
-    if (result.success && result.analysis) {
-      renderAIAnalysis(result.analysis, buData.AP || []);
-    } else {
-      aiContent.innerHTML = '<div class="ai-error">Không thể phân tích. Vui lòng thử lại.</div>';
+    if (!response.ok) {
+      throw new Error(`API trả về lỗi ${response.status}`);
     }
+
+    const data = await response.json();
+    const content = data.choices && data.choices[0] && data.choices[0].message
+      ? data.choices[0].message.content : '';
+
+    // Parse JSON từ response (có thể có markdown code block)
+    let analysis;
+    try {
+      const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      analysis = JSON.parse(jsonStr);
+    } catch(parseErr) {
+      // Fallback: hiển thị raw text
+      aiContent.innerHTML = `<div class="ai-summary"><div class="ai-summary-content">${escHtml(content).replace(/\n/g, '<br>')}</div></div>`;
+      return;
+    }
+
+    renderAIAnalysis(analysis, apRows);
   } catch(e) {
-    aiContent.innerHTML = '<div class="ai-error">Lỗi kết nối: ' + escHtml(e.message) + '</div>';
+    aiContent.innerHTML = '<div class="ai-error">Lỗi: ' + escHtml(e.message) + '</div>';
   } finally {
     aiBtn.disabled = false;
     aiBtn.innerHTML = '🤖 Phân tích Action Plan bằng AI';
