@@ -107,11 +107,37 @@ const DEFAULT_DAILY_FIELDS = [
 
 // ===================== DYNAMIC DAILY FIELDS HELPERS =====================
 
-/** Returns active daily fields: config daily_fields if loaded, else DEFAULT_DAILY_FIELDS */
+/** Returns active daily fields: config daily_fields if loaded, else DEFAULT_DAILY_FIELDS.
+ *  Mỗi field trong config được merge với DEFAULT để đảm bảo không thiếu role/type.
+ *  Nếu config thiếu field có trong DEFAULT, tự động thêm vào.
+ */
 function getDailyFields() {
   const cfg = state.config.data;
   if (cfg && cfg.daily_fields && Array.isArray(cfg.daily_fields.list) && cfg.daily_fields.list.length > 0) {
-    return cfg.daily_fields.list;
+    const cfgList = cfg.daily_fields.list;
+    const cfgIds = new Set(cfgList.map(f => f.id));
+    // Merge: bổ sung field từ DEFAULT nếu config thiếu
+    const merged = [...cfgList];
+    DEFAULT_DAILY_FIELDS.forEach(df => {
+      if (!cfgIds.has(df.id)) {
+        // Thêm vào đúng group, trước note
+        const groupFields = merged.filter(f => f.group === df.group);
+        const noteIdx = merged.findIndex(f => f.role === 'note');
+        if (noteIdx >= 0) {
+          merged.splice(noteIdx, 0, df);
+        } else {
+          merged.push(df);
+        }
+      }
+    });
+    // Đảm bảo mỗi field có role và type
+    return merged.map(f => {
+      if (!f.role || !f.type) {
+        const def = DEFAULT_DAILY_FIELDS.find(d => d.id === f.id);
+        return { ...f, role: f.role || (def ? def.role : 'activity'), type: f.type || (def ? def.type : 'number') };
+      }
+      return f;
+    });
   }
   return DEFAULT_DAILY_FIELDS;
 }
