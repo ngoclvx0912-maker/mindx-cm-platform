@@ -176,6 +176,27 @@ function getDailyHeaders() {
 // Keep DAILY_FIELDS as alias for backward compatibility (read-only)
 const DAILY_FIELDS = DEFAULT_DAILY_FIELDS;
 
+// ===================== FIELD ALIASES (module-level) =====================
+// Ánh xạ tên cột cũ → tên cột mới (backward compat khi Sheet vẫn dùng tên cũ)
+const FIELD_ALIASES = {
+  cs_touchpoint: 'calls_cskh',
+  phhs_reupsell: 'lead_referral',
+  trial_done_n1: 'trial_mkt'
+};
+
+/** Áp dụng alias mapping cho mảng rows: cột cũ → cột mới nếu cột mới chưa có giá trị */
+function applyFieldAliases(rows) {
+  return rows.map(row => {
+    const r = Object.assign({}, row);
+    Object.entries(FIELD_ALIASES).forEach(([oldKey, newKey]) => {
+      if (r[oldKey] !== undefined && (r[newKey] === undefined || r[newKey] === 0 || r[newKey] === '0' || r[newKey] === '')) {
+        r[newKey] = r[oldKey];
+      }
+    });
+    return r;
+  });
+}
+
 const DAILY_HEADERS = [
   'bu', 'date',
   'lead_mkt', 'calls_n1', 'trial_book', 'trial_mkt', 'deal_n1', 'revenue_n1',
@@ -5342,8 +5363,8 @@ async function loadDailyMTD() {
 
       // Totals
       html += '<div class="daily-mtd-group daily-mtd-group-total"><div class="daily-mtd-group-title">TỔỆNG HỢP MTD</div>';
-      html += `<div class="daily-mtd-item daily-mtd-item-total"><span class="daily-mtd-item-label">Tổng Deal BU</span><span class="daily-mtd-item-value">${totalDeal}</span></div>`;
-      html += `<div class="daily-mtd-item daily-mtd-item-total"><span class="daily-mtd-item-label">Tổng Doanh số</span><span class="daily-mtd-item-value">${totalRev}M</span></div>`;
+      html += `<div class="daily-mtd-item daily-mtd-item-total"><span class="daily-mtd-item-label">Tổng Deal BU</span><span class="daily-mtd-item-value">${fmtN(totalDeal)}</span></div>`;
+      html += `<div class="daily-mtd-item daily-mtd-item-total"><span class="daily-mtd-item-label">Tổng Doanh số</span><span class="daily-mtd-item-value">${fmtRev(totalRev)}</span></div>`;
       html += '</div>';
 
       // Auto-calculated KPIs
@@ -5475,27 +5496,10 @@ async function loadDailyOps() {
 
     if (loading) loading.style.display = 'none';
 
-    // Alias mapping: cột cũ → cột mới (backward compat khi Sheet vẫn dùng tên cũ)
-    const FIELD_ALIASES = {
-      cs_touchpoint: 'calls_cskh',
-      phhs_reupsell: 'lead_referral',
-      trial_done_n1: 'trial_mkt'
-    };
-    function applyAliases(rows) {
-      return rows.map(row => {
-        const r = Object.assign({}, row);
-        Object.entries(FIELD_ALIASES).forEach(([oldKey, newKey]) => {
-          if (r[oldKey] !== undefined && (r[newKey] === undefined || r[newKey] === 0 || r[newKey] === '0' || r[newKey] === '')) {
-            r[newKey] = r[oldKey];
-          }
-        });
-        return r;
-      });
-    }
-
+    // Dùng hàm module-level applyFieldAliases() để nhất quán
     if (allData.length > 0) {
-      state.dailyOps.rawData = applyAliases(allData);
-      state.dailyOps._prevData = applyAliases(prevData || []);
+      state.dailyOps.rawData = applyFieldAliases(allData);
+      state.dailyOps._prevData = applyFieldAliases(prevData || []);
       if (content) content.style.display = '';
       renderDailyOps();
     } else {
@@ -5925,6 +5929,24 @@ function fmtDops(value, type) {
   return String(v);
 }
 
+/** Short number formatter for analytics: auto K/M/B */
+function fmtN(v) {
+  const n = Number(v) || 0;
+  if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (Math.abs(n) >= 10000) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
+  if (Math.abs(n) >= 1000) return n.toLocaleString('en-US');
+  return String(n);
+}
+
+/** Format revenue (input in triệu) to M/B display */
+function fmtRev(v) {
+  const n = Number(v) || 0;
+  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (Math.abs(n) >= 100) return Math.round(n) + 'M';
+  return n.toFixed(1) + 'M';
+}
+
 // ============================================================
 // CM ANALYTICAL TAB — Single-BU version of FM Analytics
 // ============================================================
@@ -6005,8 +6027,9 @@ async function loadCMAnalytics() {
       return;
     }
 
-    state.cmAnalytics.rawData = allData;
-    const buRows = allData.filter(r => r.bu === bu);
+    const aliasedData = applyFieldAliases(allData);
+    state.cmAnalytics.rawData = aliasedData;
+    const buRows = aliasedData.filter(r => r.bu === bu);
     if (buRows.length === 0) {
       state.cmAnalytics.buData = null;
       if (empty) { empty.style.display = ''; empty.textContent = `Chưa có dữ liệu cho ${bu} trong tháng ${month}`; }
@@ -6067,12 +6090,26 @@ function renderCMAnalytics() {
   const n3_rev = _sum(filtered, 'revenue_n3');
   const n3_calls_avg = n3_calls / avgDays;
 
-  const WM_BENCH = {
-    calls_n1:  getBenchmark('calls_n1')  || 15,
-    trial_mkt: getBenchmark('trial_mkt') || 3,
-    calls_cskh: getBenchmark('calls_cskh') || 10,
-    calls_n3:  getBenchmark('calls_n3')  || 5
-  };
+  // Dynamic WM_BENCH từ getDailyFields() — tất cả fields có role call/trial_book/activity và benchmark > 0
+  const WM_BENCH = {};
+  getDailyFields().forEach(f => {
+    if (['call', 'trial_book', 'activity'].includes(f.role)) {
+      const b = getBenchmark(f.id);
+      if (b > 0) WM_BENCH[f.id] = b;
+    }
+  });
+  if (!WM_BENCH.calls_n1)   WM_BENCH.calls_n1   = 15;
+  if (!WM_BENCH.calls_cskh) WM_BENCH.calls_cskh = 10;
+  if (!WM_BENCH.calls_n3)   WM_BENCH.calls_n3   = 5;
+  const wmKeys = Object.keys(WM_BENCH);
+
+  // Số Trial Book MKT và N3 extras
+  const n1_trial_book = _sum(filtered, 'trial_book');
+  const n1_trial_book_avg = n1_trial_book / avgDays;
+  const n3_direct = _sum(filtered, 'direct_sales');
+  const n3_trial_book_n3 = _sum(filtered, 'trial_book_n3');
+  const n3_direct_avg = n3_direct / avgDays;
+  const n3_trial_book_n3_avg = n3_trial_book_n3 / avgDays;
 
   function cmWmRow(label, total, avgPerDay, bench, unit) {
     const pct = bench > 0 ? Math.min(avgPerDay / bench * 100, 150) : 0;
@@ -6080,7 +6117,7 @@ function renderCMAnalytics() {
     const color = _barColor(avgPerDay, bench, bench * 0.6);
     return `<div class="ana-wm-row">
       <span class="ana-wm-label">${label}</span>
-      <span class="ana-wm-value">${total}</span>
+      <span class="ana-wm-value">${fmtN(total)}</span>
       <div class="ana-wm-bar-wrap"><div class="ana-wm-bar" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
       <span class="ana-wm-badge ${b.cls}">${avgPerDay.toFixed(1)}${unit}/ngày</span>
       <span class="ana-wm-benchmark">(B: ${bench})</span>
@@ -6094,10 +6131,15 @@ function renderCMAnalytics() {
       <div class="ana-wm-source">
         <div class="ana-wm-source-title n1">N1 — Optimize (MKT)</div>
         ${cmWmRow('Số call N1', n1_calls, n1_calls_avg, WM_BENCH.calls_n1, '')}
-        ${cmWmRow('L4 Trial MKT', n1_trial_mkt, n1_trial_mkt_avg, WM_BENCH.trial_mkt, '')}
+        ${WM_BENCH.trial_book > 0 ? cmWmRow('Số Trial Book MKT', n1_trial_book, n1_trial_book_avg, WM_BENCH.trial_book, '') : ''}
+        <div class="ana-wm-row">
+          <span class="ana-wm-label">L4 Trial MKT</span>
+          <span class="ana-wm-value">${fmtN(n1_trial_mkt)}</span>
+          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${n1_trial_mkt_avg.toFixed(1)}/ngày</span>
+        </div>
         <div class="ana-wm-row">
           <span class="ana-wm-label">L1 Lead MKT</span>
-          <span class="ana-wm-value">${n1_leads}</span>
+          <span class="ana-wm-value">${fmtN(n1_leads)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n1_leads / avgDays).toFixed(1)}/ngày</span>
         </div>
       </div>
@@ -6106,26 +6148,28 @@ function renderCMAnalytics() {
         ${cmWmRow('Số call CSKH', n2_calls_cskh, n2_cskh_avg, WM_BENCH.calls_cskh, '')}
         <div class="ana-wm-row">
           <span class="ana-wm-label">L2 Referral</span>
-          <span class="ana-wm-value">${n2_lead_ref}</span>
+          <span class="ana-wm-value">${fmtN(n2_lead_ref)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_lead_ref / avgDays).toFixed(2)}/ngày</span>
         </div>
         <div class="ana-wm-row">
           <span class="ana-wm-label">L6 Re/Upsell</span>
-          <span class="ana-wm-value">${n2_deal_re}</span>
+          <span class="ana-wm-value">${fmtN(n2_deal_re)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_deal_re / avgDays).toFixed(2)}/ngày</span>
         </div>
         <div class="ana-wm-row">
           <span class="ana-wm-label">L6 Referral</span>
-          <span class="ana-wm-value">${n2_deal_ref}</span>
+          <span class="ana-wm-value">${fmtN(n2_deal_ref)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_deal_ref / avgDays).toFixed(2)}/ngày</span>
         </div>
       </div>
       <div class="ana-wm-source">
         <div class="ana-wm-source-title n3">N3 — Growth (Tự kiếm)</div>
         ${cmWmRow('Số call N3', n3_calls, n3_calls_avg, WM_BENCH.calls_n3, '')}
+        ${WM_BENCH.direct_sales > 0 ? cmWmRow('Lượt đi Direct', n3_direct, n3_direct_avg, WM_BENCH.direct_sales, '') : ''}
+        ${WM_BENCH.trial_book_n3 > 0 ? cmWmRow('Số Trial Book N3', n3_trial_book_n3, n3_trial_book_n3_avg, WM_BENCH.trial_book_n3, '') : ''}
         <div class="ana-wm-row">
           <span class="ana-wm-label">L1 Leads tự kiếm</span>
-          <span class="ana-wm-value">${n3_leads}</span>
+          <span class="ana-wm-value">${fmtN(n3_leads)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n3_leads / avgDays).toFixed(1)}/ngày</span>
         </div>
       </div>
@@ -6145,12 +6189,20 @@ function renderCMAnalytics() {
     return val >= goodT ? 'good' : val >= warnT ? 'warn' : 'bad';
   }
   function cmFunnelStep(num, label) {
-    return `<div class="ana-funnel-step"><span class="ana-funnel-num">${num}</span><span class="ana-funnel-label">${label}</span></div>`;
+    return `<div class="ana-funnel-step"><span class="ana-funnel-num">${fmtN(num)}</span><span class="ana-funnel-label">${label}</span></div>`;
   }
   function cmFunnelArrow(crVal, crLabel, goodT, warnT, inv) {
     const cls = cmCrBadge(crVal, goodT, warnT, inv);
     return `<div class="ana-funnel-step"><span class="ana-funnel-arrow">↓</span><span class="ana-funnel-cr ${cls}">${crLabel}: ${crVal.toFixed(1)}% (B: ${goodT}%)</span></div>`;
   }
+
+  // CR benchmarks từ getCRBenchmark() (hỗ trợ cấu hình động)
+  const bmCR16n1  = getCRBenchmark('N1', 'cr16')       || parseFloat(bm.cr16_n1)    || 15;
+  const bmCR46n1  = getCRBenchmark('N1', 'cr46')       || parseFloat(bm.cr46_n1)    || 50;
+  const bmCRre    = getCRBenchmark('N2', 'cr_reupsell') || parseFloat(bm.cr_reupsell) || 15;
+  const bmCRref   = getCRBenchmark('N2', 'cr_referral') || parseFloat(bm.cr_referral) || 5;
+  const bmCR16n3  = getCRBenchmark('N3', 'cr16')       || parseFloat(bm.cr16_n3)    || 10;
+  const bmCR46n3  = getCRBenchmark('N3', 'cr46')       || parseFloat(bm.cr46_n3)    || 40;
 
   const convEl = document.getElementById('cm-ana-conversion');
   if (convEl) {
@@ -6158,38 +6210,38 @@ function renderCMAnalytics() {
       <div class="ana-conv-source">
         <div class="ana-conv-title n1">N1 — Funnel MKT</div>
         ${cmFunnelStep(n1_leads, 'L1 Lead MKT')}
-        ${cmFunnelArrow(cr16_n1, 'CR16', parseFloat(bm.cr16_n1)||15, 10, false)}
+        ${cmFunnelArrow(cr16_n1, 'CR16', bmCR16n1, Math.round(bmCR16n1 * 0.67), false)}
         ${cmFunnelStep(n1_trial_mkt, 'L4 Trial MKT')}
-        ${cmFunnelArrow(cr46_n1, 'CR46', parseFloat(bm.cr46_n1)||50, 35, false)}
+        ${cmFunnelArrow(cr46_n1, 'CR46', bmCR46n1, Math.round(bmCR46n1 * 0.7), false)}
         ${cmFunnelStep(n1_deals, 'L6 Deal MKT')}
         <div class="ana-funnel-step" style="margin-top:6px;border-top:1px solid var(--gray-200);padding-top:8px">
-          <span class="ana-funnel-num" style="color:var(--red)">${n1_rev}M</span>
+          <span class="ana-funnel-num" style="color:var(--red)">${fmtRev(n1_rev)}</span>
           <span class="ana-funnel-label">Doanh số N1</span>
         </div>
       </div>
       <div class="ana-conv-source">
         <div class="ana-conv-title n2">N2 — Funnel Ops</div>
         ${cmFunnelStep(n2_lead_ref, 'L2 Referral')}
-        ${cmFunnelArrow(cr_re, 'CR Re/Upsell', parseFloat(bm.cr_reupsell)||15, 8, false)}
+        ${cmFunnelArrow(cr_re, 'CR Re/Upsell', bmCRre, Math.round(bmCRre * 0.53), false)}
         ${cmFunnelStep(n2_deal_re, 'L6 Re/Upsell')}
         <div style="height:12px"></div>
         ${cmFunnelStep(n2_lead_ref, 'L2 Referral')}
-        ${cmFunnelArrow(cr_ref, 'CR Referral', parseFloat(bm.cr_referral)||5, 2, false)}
+        ${cmFunnelArrow(cr_ref, 'CR Referral', bmCRref, Math.round(bmCRref * 0.4), false)}
         ${cmFunnelStep(n2_deal_ref, 'L6 Referral')}
         <div class="ana-funnel-step" style="margin-top:6px;border-top:1px solid var(--gray-200);padding-top:8px">
-          <span class="ana-funnel-num" style="color:#1a5aa0">${n2_rev}M</span>
+          <span class="ana-funnel-num" style="color:#1a5aa0">${fmtRev(n2_rev)}</span>
           <span class="ana-funnel-label">Doanh số N2</span>
         </div>
       </div>
       <div class="ana-conv-source">
         <div class="ana-conv-title n3">N3 — Funnel Growth</div>
         ${cmFunnelStep(n3_leads, 'Lead N3')}
-        ${cmFunnelArrow(cr16_n3, 'CR16', parseFloat(bm.cr16_n3)||10, 5, false)}
+        ${cmFunnelArrow(cr16_n3, 'CR16', bmCR16n3, Math.round(bmCR16n3 * 0.5), false)}
         ${cmFunnelStep(n3_trial, 'Trial N3')}
-        ${cmFunnelArrow(cr46_n3, 'CR46', parseFloat(bm.cr46_n3)||40, 25, false)}
+        ${cmFunnelArrow(cr46_n3, 'CR46', bmCR46n3, Math.round(bmCR46n3 * 0.63), false)}
         ${cmFunnelStep(n3_deals, 'Deal N3')}
         <div class="ana-funnel-step" style="margin-top:6px;border-top:1px solid var(--gray-200);padding-top:8px">
-          <span class="ana-funnel-num" style="color:var(--green)">${n3_rev}M</span>
+          <span class="ana-funnel-num" style="color:var(--green)">${fmtRev(n3_rev)}</span>
           <span class="ana-funnel-label">Doanh số N3</span>
         </div>
       </div>
@@ -6199,12 +6251,9 @@ function renderCMAnalytics() {
   // SECTION 3: DIAGNOSTIC (single BU)
   const totalDeals = n1_deals + n2_deal_re + n2_deal_ref + n3_deals;
   const totalRev = n1_rev + n2_rev + n3_rev;
-  const workScore = (
-    n1_calls_avg / WM_BENCH.calls_n1 +
-    n1_trial_mkt_avg / WM_BENCH.trial_mkt +
-    n2_cskh_avg / WM_BENCH.calls_cskh +
-    n3_calls_avg / WM_BENCH.calls_n3
-  ) / 4 * 100;
+  // workScore: tính động tử tất cả metrics trong WM_BENCH
+  const wsSum = wmKeys.reduce((s, fid) => s + Math.min((_sum(filtered, fid) / avgDays) / WM_BENCH[fid], 1.5), 0);
+  const workScore = wmKeys.length > 0 ? (wsSum / wmKeys.length) * 100 : 0;
   const dealPerDay = totalDeals / avgDays;
   const isHW = workScore >= 70;
   const isGR = dealPerDay >= 0.8 && cr16_n1 >= 12;
@@ -6256,10 +6305,10 @@ function renderCMAnalytics() {
   else
     actions.push({ type: 'good', icon: '✅', text: `<strong>Calls N1 đạt chuẩn (${n1_calls_avg.toFixed(1)}/ngày)</strong> — Tiếp tục duy trì.` });
 
-  if (cr46_n1 < (parseFloat(bm.cr46_n1) || 50) * 0.7)
-    actions.push({ type: 'alert', icon: '🎯', text: `<strong>CR46 N1 thấp (${cr46_n1.toFixed(1)}%)</strong> — Gọn trial nhưng không chốt được. Cần review kỹ năng close và trial quality.` });
-  else if (cr46_n1 < (parseFloat(bm.cr46_n1) || 50))
-    actions.push({ type: 'improve', icon: '🎯', text: `<strong>CR46 N1 cần cải thiện (${cr46_n1.toFixed(1)}%)</strong> — Benchmark ${bm.cr46_n1 || 50}%. Cải thiện trial quality và follow-up trong 24h.` });
+  if (cr46_n1 < bmCR46n1 * 0.7)
+    actions.push({ type: 'alert', icon: '🎯', text: `<strong>CR46 N1 thấp (${cr46_n1.toFixed(1)}%)</strong> — Nhiều trial nhưng chưa chốt được. Cần review kỹ năng close và chất lượng trial.` });
+  else if (cr46_n1 < bmCR46n1)
+    actions.push({ type: 'improve', icon: '🎯', text: `<strong>CR46 N1 cần cải thiện (${cr46_n1.toFixed(1)}%)</strong> — Benchmark ${bmCR46n1}%. Cải thiện chất lượng trial và follow-up trong 24h.` });
 
   if (n2_cskh_avg < WM_BENCH.calls_cskh * 0.6)
     actions.push({ type: 'alert', icon: '🔄', text: `<strong>Calls CSKH quá thấp (${n2_cskh_avg.toFixed(1)}/ngày)</strong> — Chưa đủ chăm sóc học viên. Cần tăng cuộc gọi CSKH.` });
@@ -6648,6 +6697,7 @@ async function loadAnalytics() {
   try {
     let allData = null;
     if (state.dailyOps.rawData && state.dailyOps.month === month) {
+      // dailyOps data already has aliases applied
       allData = state.dailyOps.rawData;
     } else {
       try {
@@ -6661,10 +6711,12 @@ async function loadAnalytics() {
         }));
         results.forEach(rows => { allData = allData.concat(rows); });
       }
+      // Apply aliases if freshly fetched (dailyOps already applied)
+      allData = applyFieldAliases(allData);
     }
     if (loading) loading.style.display = 'none';
     if (allData.length > 0) {
-      state.analytics.rawData = allData;
+      state.analytics.rawData = allData; // aliases already applied above
       if (content) content.style.display = '';
       renderAnalytics();
     } else {
@@ -6696,16 +6748,28 @@ function _barColor(val, good, warn) {
 // Helper: compute per-BU stats for comparison tables
 // ============================================================
 function _computeBUStats(data, uniqueBUs) {
-  const WM_BENCH = {
-    calls_n1:   getBenchmark('calls_n1')   || 15,
-    trial_book: getBenchmark('trial_book') || 5,
-    trial_mkt:  getBenchmark('trial_mkt')  || 3,
-    calls_cskh: getBenchmark('calls_cskh') || 10,
-    calls_n3:   getBenchmark('calls_n3')   || 5,
-    direct_sales: getBenchmark('direct_sales') || 2
-  };
+  // Dynamic WM_BENCH from getDailyFields() — include all call/trial_book/activity fields with benchmark > 0
+  const WM_BENCH = {};
+  getDailyFields().forEach(f => {
+    if (['call', 'trial_book', 'activity'].includes(f.role)) {
+      const b = getBenchmark(f.id);
+      if (b > 0) WM_BENCH[f.id] = b;
+    }
+  });
+  // Fallback defaults nếu config chưa có benchmark
+  if (!WM_BENCH.calls_n1)   WM_BENCH.calls_n1   = 15;
+  if (!WM_BENCH.calls_cskh) WM_BENCH.calls_cskh = 10;
+  if (!WM_BENCH.calls_n3)   WM_BENCH.calls_n3   = 5;
+
+  // Số metrics có trong WM_BENCH dùng để tính workScore trung bình
+  const wmKeys = Object.keys(WM_BENCH);
+  const wmCount = wmKeys.length || 1;
+
+  // Áp dụng aliases trước khi tính (data đã được alias ở lập load, nhưng guard lại cho chắc)
+  const aliasedData = applyFieldAliases(data);
+
   return uniqueBUs.map(bu => {
-    const rows = data.filter(r => r.bu === bu);
+    const rows = aliasedData.filter(r => r.bu === bu);
     const days = [...new Set(rows.map(r => r.date))].length || 1;
     const n1c = _sum(rows,'calls_n1'), n1tb = _sum(rows,'trial_book'), n1tm = _sum(rows,'trial_mkt');
     const n1l = _sum(rows,'lead_mkt'), n1d = _sum(rows,'deal_n1'), n1r = _sum(rows,'revenue_n1');
@@ -6715,7 +6779,9 @@ function _computeBUStats(data, uniqueBUs) {
     const n3l = _sum(rows,'lead_n3'), n3t = _sum(rows,'trial_n3'), n3d = _sum(rows,'deal_n3'), n3r = _sum(rows,'revenue_n3');
     const totalDeals = n1d + n2dr + n2dref + n3d;
     const totalRev = n1r + n2r + n3r;
-    const ws = ((n1c/days)/WM_BENCH.calls_n1 + (n1tb/days)/WM_BENCH.trial_book + (n2cskh/days)/WM_BENCH.calls_cskh + (n3c/days)/WM_BENCH.calls_n3) / 4 * 100;
+    // workScore: trung bình tất cả metrics trong WM_BENCH
+    const wsSum = wmKeys.reduce((s, fid) => s + Math.min((_sum(rows, fid)/days) / WM_BENCH[fid], 1.5), 0);
+    const ws = (wsSum / wmCount) * 100;
     return {
       bu, days,
       calls: n1c/days, trial_book: n1tb/days, trial_mkt: n1tm/days, cskh: n2cskh/days, lead_ref: n2lr/days,
@@ -6728,7 +6794,8 @@ function _computeBUStats(data, uniqueBUs) {
       cr16_n1: _pct(n1d, n1l), cr46_n1: _pct(n1d, n1tm),
       cr_re: _pct(n2dr, n2lr), cr_ref: _pct(n2dref, n2lr),
       cr16_n3: _pct(n3d, n3l), cr46_n3: _pct(n3d, n3t),
-      workScore: ws
+      workScore: ws,
+      WM_BENCH // expose for callers
     };
   });
 }
@@ -6798,12 +6865,26 @@ function renderAnalytics() {
   const n3_rev = _sum(filtered, 'revenue_n3');
   const n3_calls_avg = buCount > 0 ? (n3_calls / buCount / avgDays) : 0;
 
-  const WM_BENCH = {
-    calls_n1:  getBenchmark('calls_n1')  || 15,
-    trial_mkt: getBenchmark('trial_mkt') || 3,
-    calls_cskh: getBenchmark('calls_cskh') || 10,
-    calls_n3:  getBenchmark('calls_n3')  || 5
-  };
+  // Dynamic WM_BENCH từ getDailyFields() — tất cả fields có role call/trial_book/activity và benchmark > 0
+  const WM_BENCH = {};
+  getDailyFields().forEach(f => {
+    if (['call', 'trial_book', 'activity'].includes(f.role)) {
+      const b = getBenchmark(f.id);
+      if (b > 0) WM_BENCH[f.id] = b;
+    }
+  });
+  if (!WM_BENCH.calls_n1)   WM_BENCH.calls_n1   = 15;
+  if (!WM_BENCH.calls_cskh) WM_BENCH.calls_cskh = 10;
+  if (!WM_BENCH.calls_n3)   WM_BENCH.calls_n3   = 5;
+  const wmKeys = Object.keys(WM_BENCH);
+
+  // Các field N3 extras
+  const n1_trial_book = _sum(filtered, 'trial_book');
+  const n1_trial_book_avg = buCount > 0 ? (n1_trial_book / buCount / avgDays) : 0;
+  const n3_direct = _sum(filtered, 'direct_sales');
+  const n3_trial_book_n3 = _sum(filtered, 'trial_book_n3');
+  const n3_direct_avg = buCount > 0 ? (n3_direct / buCount / avgDays) : 0;
+  const n3_trial_book_n3_avg = buCount > 0 ? (n3_trial_book_n3 / buCount / avgDays) : 0;
 
   function wmRow(label, total, avgPerDay, bench, unit) {
     const pct = bench > 0 ? Math.min(avgPerDay / bench * 100, 150) : 0;
@@ -6811,7 +6892,7 @@ function renderAnalytics() {
     const color = _barColor(avgPerDay, bench, bench * 0.6);
     return `<div class="ana-wm-row">
       <span class="ana-wm-label">${label}</span>
-      <span class="ana-wm-value">${total}</span>
+      <span class="ana-wm-value">${fmtN(total)}</span>
       <div class="ana-wm-bar-wrap"><div class="ana-wm-bar" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
       <span class="ana-wm-badge ${b.cls}">${avgPerDay.toFixed(1)}${unit}/BU/ng\u00E0y</span>
       <span class="ana-wm-benchmark">(B: ${bench})</span>
@@ -6824,10 +6905,15 @@ function renderAnalytics() {
       <div class="ana-wm-source">
         <div class="ana-wm-source-title n1">N1 \u2014 Optimize (MKT)</div>
         ${wmRow('S\u1ED1 call N1', n1_calls, n1_calls_avg, WM_BENCH.calls_n1, '')}
-        ${wmRow('L4 Trial MKT', n1_trial_mkt, n1_trial_mkt_avg, WM_BENCH.trial_mkt, '')}
+        ${WM_BENCH.trial_book > 0 ? wmRow('S\u1ED1 Trial Book MKT', n1_trial_book, n1_trial_book_avg, WM_BENCH.trial_book, '') : ''}
+        <div class="ana-wm-row">
+          <span class="ana-wm-label">L4 Trial MKT</span>
+          <span class="ana-wm-value">${fmtN(n1_trial_mkt)}</span>
+          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${n1_trial_mkt_avg.toFixed(1)}/BU/ng\u00E0y</span>
+        </div>
         <div class="ana-wm-row">
           <span class="ana-wm-label">L1 Lead MKT</span>
-          <span class="ana-wm-value">${n1_leads}</span>
+          <span class="ana-wm-value">${fmtN(n1_leads)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n1_leads / Math.max(buCount,1) / avgDays).toFixed(1)}/BU/ng\u00E0y</span>
         </div>
       </div>
@@ -6836,26 +6922,28 @@ function renderAnalytics() {
         ${wmRow('S\u1ED1 call CSKH', n2_calls_cskh, n2_cskh_avg, WM_BENCH.calls_cskh, '')}
         <div class="ana-wm-row">
           <span class="ana-wm-label">L2 Referral</span>
-          <span class="ana-wm-value">${n2_lead_ref}</span>
+          <span class="ana-wm-value">${fmtN(n2_lead_ref)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_lead_ref / Math.max(buCount,1) / avgDays).toFixed(2)}/BU/ng\u00E0y</span>
         </div>
         <div class="ana-wm-row">
           <span class="ana-wm-label">L6 Re/Upsell</span>
-          <span class="ana-wm-value">${n2_deal_re}</span>
+          <span class="ana-wm-value">${fmtN(n2_deal_re)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_deal_re / Math.max(buCount,1) / avgDays).toFixed(2)}/BU/ng\u00E0y</span>
         </div>
         <div class="ana-wm-row">
           <span class="ana-wm-label">L6 Referral</span>
-          <span class="ana-wm-value">${n2_deal_ref}</span>
+          <span class="ana-wm-value">${fmtN(n2_deal_ref)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_deal_ref / Math.max(buCount,1) / avgDays).toFixed(2)}/BU/ng\u00E0y</span>
         </div>
       </div>
       <div class="ana-wm-source">
         <div class="ana-wm-source-title n3">N3 \u2014 Growth (T\u1EF1 ki\u1EBFm)</div>
         ${wmRow('S\u1ED1 call N3', n3_calls, n3_calls_avg, WM_BENCH.calls_n3, '')}
+        ${WM_BENCH.direct_sales > 0 ? wmRow('L\u01b0\u1ee3t \u0111i Direct', n3_direct, n3_direct_avg, WM_BENCH.direct_sales, '') : ''}
+        ${WM_BENCH.trial_book_n3 > 0 ? wmRow('S\u1ED1 Trial Book N3', n3_trial_book_n3, n3_trial_book_n3_avg, WM_BENCH.trial_book_n3, '') : ''}
         <div class="ana-wm-row">
           <span class="ana-wm-label">L1 Leads t\u1EF1 ki\u1EBFm</span>
-          <span class="ana-wm-value">${n3_leads}</span>
+          <span class="ana-wm-value">${fmtN(n3_leads)}</span>
           <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n3_leads / Math.max(buCount,1) / avgDays).toFixed(1)}/BU/ng\u00E0y</span>
         </div>
       </div>
@@ -6872,20 +6960,25 @@ function renderAnalytics() {
     if (multiMode) {
       wmCmpEl.style.display = '';
       const sorted = [...buStats].sort((a,b) => b.calls - a.calls);
+      // Bench cho các cột so sánh — dùng WM_BENCH động, fallback về default
+      const bmCallsN1  = WM_BENCH.calls_n1  || 15;
+      const bmTrialMkt = getBenchmark('trial_book') > 0 ? getBenchmark('trial_book') : (getBenchmark('trial_mkt') || 3);
+      const bmCskh     = WM_BENCH.calls_cskh || 10;
+      const bmCallsN3  = WM_BENCH.calls_n3  || 5;
       // Find max values for bar scaling
       const wmMax = {
-        calls: Math.max(...sorted.map(s=>s.calls), WM_BENCH.calls_n1) * 1.1,
-        trial_mkt: Math.max(...sorted.map(s=>s.trial_mkt), WM_BENCH.trial_mkt) * 1.1,
-        cskh: Math.max(...sorted.map(s=>s.cskh), WM_BENCH.calls_cskh) * 1.1,
-        calls_n3: Math.max(...sorted.map(s=>s.calls_n3), WM_BENCH.calls_n3) * 1.1
+        calls:     Math.max(...sorted.map(s=>s.calls),     bmCallsN1)  * 1.1,
+        trial_mkt: Math.max(...sorted.map(s=>s.trial_mkt), bmTrialMkt) * 1.1,
+        cskh:      Math.max(...sorted.map(s=>s.cskh),      bmCskh)     * 1.1,
+        calls_n3:  Math.max(...sorted.map(s=>s.calls_n3),  bmCallsN3)  * 1.1
       };
       let rows = sorted.map(s => {
         return `<tr>
           <td>${s.bu}</td>
-          <td class="${_cmpCls(s.calls, WM_BENCH.calls_n1, WM_BENCH.calls_n1*0.6)}">${s.calls.toFixed(1)} ${_cmpBar(s.calls, wmMax.calls, WM_BENCH.calls_n1)}</td>
-          <td class="${_cmpCls(s.trial_mkt, WM_BENCH.trial_mkt, WM_BENCH.trial_mkt*0.6)}">${s.trial_mkt.toFixed(1)} ${_cmpBar(s.trial_mkt, wmMax.trial_mkt, WM_BENCH.trial_mkt)}</td>
-          <td class="${_cmpCls(s.cskh, WM_BENCH.calls_cskh, WM_BENCH.calls_cskh*0.6)}">${s.cskh.toFixed(1)} ${_cmpBar(s.cskh, wmMax.cskh, WM_BENCH.calls_cskh)}</td>
-          <td class="${_cmpCls(s.calls_n3, WM_BENCH.calls_n3, WM_BENCH.calls_n3*0.6)}">${s.calls_n3.toFixed(1)} ${_cmpBar(s.calls_n3, wmMax.calls_n3, WM_BENCH.calls_n3)}</td>
+          <td class="${_cmpCls(s.calls, bmCallsN1, bmCallsN1*0.6)}">${s.calls.toFixed(1)} ${_cmpBar(s.calls, wmMax.calls, bmCallsN1)}</td>
+          <td class="${_cmpCls(s.trial_mkt, bmTrialMkt, bmTrialMkt*0.6)}">${s.trial_mkt.toFixed(1)} ${_cmpBar(s.trial_mkt, wmMax.trial_mkt, bmTrialMkt)}</td>
+          <td class="${_cmpCls(s.cskh, bmCskh, bmCskh*0.6)}">${s.cskh.toFixed(1)} ${_cmpBar(s.cskh, wmMax.cskh, bmCskh)}</td>
+          <td class="${_cmpCls(s.calls_n3, bmCallsN3, bmCallsN3*0.6)}">${s.calls_n3.toFixed(1)} ${_cmpBar(s.calls_n3, wmMax.calls_n3, bmCallsN3)}</td>
         </tr>`;
       }).join('');
       rows += `<tr class="ana-cmp-summary-row">
@@ -6901,7 +6994,7 @@ function renderAnalytics() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div style="font-size:10px;color:var(--gray-400);margin-top:6px">\u0110\u01B0\u1EDDng d\u1ECDc: Benchmark | Calls N1 ${WM_BENCH.calls_n1} | Trial MKT ${WM_BENCH.trial_mkt} | CSKH ${WM_BENCH.calls_cskh} | Calls N3 ${WM_BENCH.calls_n3}</div>`;
+      <div style="font-size:10px;color:var(--gray-400);margin-top:6px">\u0110\u01B0\u1EDDng d\u1ECDc: Benchmark | Calls N1 ${bmCallsN1} | Trial MKT ${bmTrialMkt} | CSKH ${bmCskh} | Calls N3 ${bmCallsN3}</div>`;
     } else {
       wmCmpEl.style.display = 'none';
     }
@@ -6929,12 +7022,20 @@ function renderAnalytics() {
   }
 
   function funnelStep(num, label) {
-    return `<div class="ana-funnel-step"><span class="ana-funnel-num">${num}</span><span class="ana-funnel-label">${label}</span></div>`;
+    return `<div class="ana-funnel-step"><span class="ana-funnel-num">${fmtN(num)}</span><span class="ana-funnel-label">${label}</span></div>`;
   }
   function funnelArrow(crVal, crLabel, goodT, warnT, invert) {
     const cls = crBadge(crVal, goodT, warnT, invert);
     return `<div class="ana-funnel-step"><span class="ana-funnel-arrow">\u2193</span><span class="ana-funnel-cr ${cls}">${crLabel}: ${crVal.toFixed(1)}% (B: ${goodT}%)</span></div>`;
   }
+
+  // CR benchmarks từ getCRBenchmark() cho FM Analytics
+  const fmBmCR16n1 = getCRBenchmark('N1', 'cr16')        || parseFloat(bm.cr16_n1)    || 15;
+  const fmBmCR46n1 = getCRBenchmark('N1', 'cr46')        || parseFloat(bm.cr46_n1)    || 50;
+  const fmBmCRre   = getCRBenchmark('N2', 'cr_reupsell') || parseFloat(bm.cr_reupsell) || 15;
+  const fmBmCRref  = getCRBenchmark('N2', 'cr_referral') || parseFloat(bm.cr_referral) || 5;
+  const fmBmCR16n3 = getCRBenchmark('N3', 'cr16')        || parseFloat(bm.cr16_n3)    || 10;
+  const fmBmCR46n3 = getCRBenchmark('N3', 'cr46')        || parseFloat(bm.cr46_n3)    || 40;
 
   const convEl = document.getElementById('ana-conversion');
   if (convEl) {
@@ -6942,38 +7043,38 @@ function renderAnalytics() {
       <div class="ana-conv-source">
         <div class="ana-conv-title n1">N1 \u2014 Funnel MKT</div>
         ${funnelStep(n1_leads, 'L1 Lead MKT')}
-        ${funnelArrow(cr16_n1, 'CR16', parseFloat(bm.cr16_n1)||15, 10, false)}
+        ${funnelArrow(cr16_n1, 'CR16', fmBmCR16n1, Math.round(fmBmCR16n1 * 0.67), false)}
         ${funnelStep(n1_trial_mkt, 'L4 Trial MKT')}
-        ${funnelArrow(cr46_n1, 'CR46', parseFloat(bm.cr46_n1)||50, 35, false)}
+        ${funnelArrow(cr46_n1, 'CR46', fmBmCR46n1, Math.round(fmBmCR46n1 * 0.7), false)}
         ${funnelStep(n1_deals, 'L6 Deal MKT')}
         <div class="ana-funnel-step" style="margin-top:6px;border-top:1px solid var(--gray-200);padding-top:8px">
-          <span class="ana-funnel-num" style="color:var(--red)">${n1_rev}M</span>
+          <span class="ana-funnel-num" style="color:var(--red)">${fmtRev(n1_rev)}</span>
           <span class="ana-funnel-label">Doanh s\u1ED1 N1</span>
         </div>
       </div>
       <div class="ana-conv-source">
         <div class="ana-conv-title n2">N2 \u2014 Funnel Ops</div>
         ${funnelStep(n2_lead_ref, 'L2 Referral')}
-        ${funnelArrow(cr_re, 'CR Re/Upsell', parseFloat(bm.cr_reupsell)||15, 8, false)}
+        ${funnelArrow(cr_re, 'CR Re/Upsell', fmBmCRre, Math.round(fmBmCRre * 0.53), false)}
         ${funnelStep(n2_deal_re, 'L6 Re/Upsell')}
         <div style="height:12px"></div>
         ${funnelStep(n2_lead_ref, 'L2 Referral')}
-        ${funnelArrow(cr_ref, 'CR Referral', parseFloat(bm.cr_referral)||5, 2, false)}
+        ${funnelArrow(cr_ref, 'CR Referral', fmBmCRref, Math.round(fmBmCRref * 0.4), false)}
         ${funnelStep(n2_deal_ref, 'L6 Referral')}
         <div class="ana-funnel-step" style="margin-top:6px;border-top:1px solid var(--gray-200);padding-top:8px">
-          <span class="ana-funnel-num" style="color:#1a5aa0">${n2_rev}M</span>
+          <span class="ana-funnel-num" style="color:#1a5aa0">${fmtRev(n2_rev)}</span>
           <span class="ana-funnel-label">Doanh s\u1ED1 N2</span>
         </div>
       </div>
       <div class="ana-conv-source">
         <div class="ana-conv-title n3">N3 \u2014 Funnel Growth</div>
         ${funnelStep(n3_leads, 'Lead N3')}
-        ${funnelArrow(cr16_n3, 'CR16', parseFloat(bm.cr16_n3)||10, 5, false)}
+        ${funnelArrow(cr16_n3, 'CR16', fmBmCR16n3, Math.round(fmBmCR16n3 * 0.5), false)}
         ${funnelStep(n3_trial, 'Trial N3')}
-        ${funnelArrow(cr46_n3, 'CR46', parseFloat(bm.cr46_n3)||40, 25, false)}
+        ${funnelArrow(cr46_n3, 'CR46', fmBmCR46n3, Math.round(fmBmCR46n3 * 0.63), false)}
         ${funnelStep(n3_deals, 'Deal N3')}
         <div class="ana-funnel-step" style="margin-top:6px;border-top:1px solid var(--gray-200);padding-top:8px">
-          <span class="ana-funnel-num" style="color:var(--green)">${n3_rev}M</span>
+          <span class="ana-funnel-num" style="color:var(--green)">${fmtRev(n3_rev)}</span>
           <span class="ana-funnel-label">Doanh s\u1ED1 N3</span>
         </div>
       </div>
@@ -6989,9 +7090,9 @@ function renderAnalytics() {
     if (multiMode) {
       convCmpEl.style.display = '';
       const sorted = [...buStats].sort((a,b) => b.cr16_n1 - a.cr16_n1);
-      const bmCR16 = parseFloat(bm.cr16_n1)||15, bmCR46 = parseFloat(bm.cr46_n1)||50;
-      const bmCRre = parseFloat(bm.cr_reupsell)||15;
-      const bmCRref = parseFloat(bm.cr_referral)||5, bmCR16n3 = parseFloat(bm.cr16_n3)||10;
+      const bmCR16 = fmBmCR16n1, bmCR46 = fmBmCR46n1;
+      const bmCRre = fmBmCRre;
+      const bmCRref = fmBmCRref, bmCR16n3 = fmBmCR16n3;
       const crMax = {
         cr16: Math.max(...sorted.map(s=>s.cr16_n1), bmCR16) * 1.15,
         cr46: Math.max(...sorted.map(s=>s.cr46_n1), bmCR46) * 1.15,
@@ -7046,7 +7147,9 @@ function renderAnalytics() {
       else buDiag.effort.push(summary);
     });
   } else {
-    const workScore = (n1_calls_avg/WM_BENCH.calls_n1 + n1_trial_mkt_avg/WM_BENCH.trial_mkt + n2_cskh_avg/WM_BENCH.calls_cskh + n3_calls_avg/WM_BENCH.calls_n3) / 4 * 100;
+    // workScore động từ WM_BENCH (single-BU mode)
+    const wsSum2 = wmKeys.reduce((s, fid) => s + Math.min((_sum(filtered, fid) / buCount / avgDays) / WM_BENCH[fid], 1.5), 0);
+    const workScore = wmKeys.length > 0 ? (wsSum2 / wmKeys.length) * 100 : 0;
     const dealPerDay = totalDeals / avgDays;
     const isHW = workScore >= 70;
     const isGR = dealPerDay >= 0.8 && cr16_n1 >= 12;
@@ -7104,10 +7207,10 @@ function renderAnalytics() {
     actions.push({ type: 'improve', icon: '\uD83D\uDCDE', text: `<strong>Calls c\u1EA7n c\u1EA3i thi\u1EC7n (${n1_calls_avg.toFixed(1)}/${WM_BENCH.calls_n1}/ng\u00E0y)</strong> \u2014 T\u0103ng th\u00EAm ${callGap.toFixed(0)} calls/BU/ng\u00E0y \u0111\u1EC3 \u0111\u1EA1t benchmark.` });
   else
     actions.push({ type: 'good', icon: '\u2705', text: `<strong>Calls \u0111\u1EA1t chu\u1EA9n (${n1_calls_avg.toFixed(1)}/ng\u00E0y)</strong> \u2014 Ti\u1EBFp t\u1EE5c duy tr\u00EC.` });
-  if (cr46_n1 < (parseFloat(bm.cr46_n1) || 50) * 0.7)
-    actions.push({ type: 'alert', icon: '\uD83C\uDFAF', text: `<strong>CR46 N1 th\u1EA5p (${cr46_n1.toFixed(1)}%)</strong> \u2014 C\u1EA7n review k\u1EF9 n\u0103ng close v\u00E0 trial quality.` });
-  else if (cr46_n1 < (parseFloat(bm.cr46_n1) || 50))
-    actions.push({ type: 'improve', icon: '\uD83C\uDFAF', text: `<strong>CR46 N1 c\u1EA7n c\u1EA3i thi\u1EC7n (${cr46_n1.toFixed(1)}%)</strong> \u2014 Benchmark ${bm.cr46_n1 || 50}%.` });
+  if (cr46_n1 < fmBmCR46n1 * 0.7)
+    actions.push({ type: 'alert', icon: '\uD83C\uDFAF', text: `<strong>CR46 N1 th\u1EA5p (${cr46_n1.toFixed(1)}%)</strong> \u2014 C\u1EA7n review k\u1EF9 n\u0103ng close v\u00E0 ch\u1EA5t l\u01B0\u1EE3ng trial.` });
+  else if (cr46_n1 < fmBmCR46n1)
+    actions.push({ type: 'improve', icon: '\uD83C\uDFAF', text: `<strong>CR46 N1 c\u1EA7n c\u1EA3i thi\u1EC7n (${cr46_n1.toFixed(1)}%)</strong> \u2014 Benchmark ${fmBmCR46n1}%.` });
   if (n2_cskh_avg < WM_BENCH.calls_cskh * 0.6)
     actions.push({ type: 'alert', icon: '\uD83D\uDD04', text: `<strong>Calls CSKH qu\u00E1 th\u1EA5p (${n2_cskh_avg.toFixed(1)}/ng\u00E0y)</strong> \u2014 C\u1EA7n t\u0103ng cu\u1ED9c g\u1ECDi CSKH.` });
   if (n3_calls_avg < WM_BENCH.calls_n3 * 0.5)
@@ -7171,7 +7274,7 @@ function renderAnalytics() {
         const fcRevPct = fcMax.fcRev > 0 ? Math.min(fcRev / fcMax.fcRev * 100, 100) : 0;
         return `<tr>
           <td>${s.bu}</td>
-          <td>${s.totalDeals}</td>
+          <td>${fmtN(s.totalDeals)}</td>
           <td>${s.totalRev}M<div class="cmp-bar-wrap"><div class="cmp-bar-fill" style="width:${revPct}%;background:var(--blue)"></div></div></td>
           <td>${s.dealsPerDay.toFixed(1)}</td>
           <td>${fcDeal}</td>
@@ -7180,8 +7283,8 @@ function renderAnalytics() {
       }).join('');
       rows += `<tr class="ana-cmp-summary-row">
         <td>T\u1ED5ng</td>
-        <td>${totalDeals}</td>
-        <td>${totalRev}M</td>
+        <td>${fmtN(totalDeals)}</td>
+        <td>${fmtRev(totalRev)}</td>
         <td>${dailyDealRate.toFixed(1)}</td>
         <td>${forecastDeal}</td>
         <td><strong>${forecastRev}M</strong></td>
