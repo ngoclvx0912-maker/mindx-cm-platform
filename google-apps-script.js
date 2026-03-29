@@ -131,6 +131,8 @@ function doGet(e) {
       return handleClearKPITargets(params);
     } else if (action === 'clear_tab_data') {
       return handleClearTabData(params);
+    } else if (action === 'get_staff_list') {
+      return handleGetStaffList();
     } else if (action === 'save_row') {
       return handleSaveRow(params);
     } else if (action === 'save_config_via_get') {
@@ -2162,4 +2164,176 @@ function handleSaveRow(params) {
   sheet.getRange(lastRow + 1, 1, 1, headers.length).setValues([newRow]);
 
   return makeResponse({ success: true, row_index: data.row_index });
+}
+
+// ============================================================
+// get_staff_list — Trả danh sách nhân viên Active từ sheet Staff
+// Staff sheet gid=1896503199
+// Cột: A=MSNV, B=Họ tên, C=Vị trí, D=Cơ sở (BU), E=Khu vực, F=Trạng thái
+// ============================================================
+
+// Mapping từ BU raw + region trong sheet → BU name trong app
+const STAFF_BU_MAPPING = {
+  // HCM1
+  'PVT|HCM1': 'HCM1 - PVT',
+  'PXL|HCM1': 'HCM1 - PXL',
+  'TK|HCM1': 'HCM1 - TK',
+  // HCM2
+  'LVV|HCM2': 'HCM2 - LVV',
+  'NX|HCM2': 'HCM2 - NX',
+  'PVĐ|HCM2': 'HCM2 - PVD',
+  'PVD|HCM2': 'HCM2 - PVD',
+  'SH|HCM2': 'HCM2 - SH',
+  '5H|HCM2': 'HCM2 - SH',
+  // HCM3
+  '3/2|HCM3': 'HCM3 - 3T2',
+  'HL|HCM3': 'HCM3 - HL',
+  'HL (Nguyễn Thị Thập)|HCM3': 'HCM3 - HL',
+  'HTLO|HCM3': 'HCM3 - HTLO',
+  'PMH|HCM3': 'HCM3 - PMH',
+  'PNL|HCM3': 'HCM3 - PNL',
+  // HCM4
+  'LBB|HCM4': 'HCM4 - LBB',
+  'Trường Chinh|HCM4': 'HCM4 - TC',
+  'TC|HCM4': 'HCM4 - TC',
+  'TL|HCM4': 'HCM4 - TL',
+  'TT|HCM4': 'HCM4 - TT',
+  // HN1
+  'MK|HN1': 'HN - MK',
+  'NHT|HN1': 'HN - NHT',
+  'NVC HN|HN1': 'HN - NVC',
+  'NVC|HN1': 'HN - NVC',
+  'Ocean Park|HN1': 'HN - OCP',
+  'OCP|HN1': 'HN - OCP',
+  'TP|HN1': 'HN - TP',
+  'Văn Phú|HN1': 'HN - VP',
+  'VP|HN1': 'HN - VP',
+  // HN2
+  'HĐT|HN2': 'HN - HĐT',
+  'Hàm Nghi|HN2': 'HN - VHHN',
+  'VHHN|HN2': 'HN - VHHN',
+  'NCT|HN2': 'HN - NCT',
+  'NPS|HN2': 'HN - NPS',
+  // MB1 (Tỉnh Bắc 1)
+  'BN Lý Thái Tổ|Tỉnh Bắc 1': 'MB1 - BN',
+  'BN|Tỉnh Bắc 1': 'MB1 - BN',
+  'BN Từ Sơn|Tỉnh Bắc 1': 'MB1 - TS',
+  'TS|Tỉnh Bắc 1': 'MB1 - TS',
+  'HP|Tỉnh Bắc 1': 'MB1 - HP',
+  'QN|Tỉnh Bắc 1': 'MB1 - QN',
+  // MB2 (Tỉnh Bắc 2)
+  'PT|Tỉnh Bắc 2': 'MB2 - PT',
+  'VP|Tỉnh Bắc 2': 'MB2 - VP',
+  'TN|Tỉnh Bắc 2': 'MB2 - TN',
+  // MN (Tỉnh Nam)
+  'BH (Đồng Nai)|Tỉnh Nam': 'MN - BH - PVT',
+  'BH|Tỉnh Nam': 'MN - BH - PVT',
+  'CT|Tỉnh Nam': 'MN - CT - THD',
+  'DA|Tỉnh Nam': 'MN - BD - DA',
+  'Lái Thiêu|Tỉnh Nam': 'MN - BD - TA',
+  'TA|Tỉnh Nam': 'MN - BD - TA',
+  'TDM|Tỉnh Nam': 'MN - BD - TDM',
+  'VT|Tỉnh Nam': 'MN - VT - LHP',
+  // MT (Tỉnh Trung)
+  'DN|Tỉnh Trung': 'MT - ĐN',
+  'ĐN|Tỉnh Trung': 'MT - ĐN',
+  'TH|Tỉnh Trung': 'MT - TH',
+  'NA|Tỉnh Trung': 'MT - NA',
+  // K18
+  'AM|18+': 'K18 - HCM',
+  // ONL
+  'Art|ONL': 'ONL - ART',
+  'Coding|ONL': 'ONL - COD'
+};
+
+function resolveStaffBU(buRaw, region) {
+  if (!buRaw) return '';
+  var raw = String(buRaw).trim();
+  var reg = String(region || '').trim();
+
+  // Try exact match with region
+  var key1 = raw + '|' + reg;
+  if (STAFF_BU_MAPPING[key1]) return STAFF_BU_MAPPING[key1];
+
+  // Try with cleaned region (remove parentheses etc)
+  // Try partial matches
+  var keys = Object.keys(STAFF_BU_MAPPING);
+  for (var i = 0; i < keys.length; i++) {
+    var parts = keys[i].split('|');
+    if (parts[0] === raw && reg.indexOf(parts[1]) !== -1) {
+      return STAFF_BU_MAPPING[keys[i]];
+    }
+    if (raw.indexOf(parts[0]) !== -1 && parts[1] === reg) {
+      return STAFF_BU_MAPPING[keys[i]];
+    }
+  }
+
+  return '';
+}
+
+function handleGetStaffList() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  // Get sheet by gid
+  var sheets = ss.getSheets();
+  var staffSheet = null;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].getSheetId() === 1896503199) {
+      staffSheet = sheets[i];
+      break;
+    }
+  }
+  if (!staffSheet) {
+    return makeResponse({ error: 'Staff sheet not found (gid=1896503199)' });
+  }
+
+  var data = staffSheet.getDataRange().getValues();
+  if (data.length < 2) return makeResponse([]);
+
+  // Find column indices from header row
+  var headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
+  var colMSNV = -1, colName = -1, colPos = -1, colBU = -1, colRegion = -1, colStatus = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c];
+    if (h === 'msnv' || h === 'mã số nhân viên' || h === 'ma so nhan vien') colMSNV = c;
+    else if (h === 'họ tên' || h === 'ho ten' || h === 'name' || h === 'họ và tên') colName = c;
+    else if (h === 'vị trí' || h === 'vi tri' || h === 'position' || h === 'vi trí') colPos = c;
+    else if (h === 'cơ sở' || h === 'co so' || h === 'cơ sở (bu)' || h === 'bu') colBU = c;
+    else if (h === 'khu vực' || h === 'khu vuc' || h === 'region') colRegion = c;
+    else if (h === 'trạng thái' || h === 'trang thai' || h === 'status') colStatus = c;
+  }
+
+  // Fallback: if headers not found, assume A-F
+  if (colMSNV === -1) colMSNV = 0;
+  if (colName === -1) colName = 1;
+  if (colPos === -1) colPos = 2;
+  if (colBU === -1) colBU = 3;
+  if (colRegion === -1) colRegion = 4;
+  if (colStatus === -1) colStatus = 5;
+
+  var result = [];
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var msnv = String(row[colMSNV] || '').trim();
+    var status = String(row[colStatus] || '').trim();
+
+    // Only Active staff
+    if (!msnv || (status.toLowerCase() !== 'active' && status.toLowerCase() !== 'đang làm việc')) continue;
+
+    var name = String(row[colName] || '').trim();
+    var position = String(row[colPos] || '').trim();
+    var buRaw = String(row[colBU] || '').trim();
+    var region = String(row[colRegion] || '').trim();
+    var buApp = resolveStaffBU(buRaw, region);
+
+    result.push({
+      msnv: msnv,
+      name: name,
+      position: position,
+      bu_raw: buRaw,
+      region: region,
+      bu_app: buApp
+    });
+  }
+
+  return makeResponse(result);
 }

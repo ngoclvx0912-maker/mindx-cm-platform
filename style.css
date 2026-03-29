@@ -2606,6 +2606,60 @@ body {
   background: #aa0000;
 }
 
+.auth-modal-footer {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--gray-400);
+  min-height: 18px;
+}
+
+.auth-modal-footer .auth-user-info {
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+/* Logged-in indicator on header */
+.header-user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 4px 12px 4px 8px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.8);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.header-user-badge:hover {
+  background: rgba(255,255,255,0.18);
+}
+
+.header-user-badge .badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4caf50;
+  flex-shrink: 0;
+}
+
+.header-user-badge .badge-label {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* BU selector locked state */
+.topbar-select.bu-locked {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  pointer-events: none;
+  opacity: 0.85;
+  border-color: var(--gray-300);
+}
+
 /* ===================== CONFIG VIEW ===================== */
 .header-nav-config {
   display: inline-flex;

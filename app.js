@@ -350,53 +350,370 @@ function showSetupBanner() {
   document.body.insertBefore(banner, document.getElementById('app-header').nextSibling);
 }
 
-// ===================== ACCESS CONTROL =====================
-const ACCESS_PROTECTED_VIEWS = ['dashboard', 'config'];
-let accessGranted = false;
+// ===================== ACCESS CONTROL (3-tier) =====================
+// Tier 1 — CM: mã nhân viên (MSNV) → auto-select BU, lock selector
+// Tier 2 — FM: password MindX@2026 → full dashboard access
+// Tier 3 — Admin: password Admin@123 → config access
 
-// Mật khẩu được encode
-const ENCODED_PW = btoa('MindX@123');
+const ACCESS_CM_VIEWS = ['cm', 'daily', 'discussion'];
+const ACCESS_FM_VIEWS = ['dashboard'];
+const ACCESS_ADMIN_VIEWS = ['config'];
 
-function checkPassword(input) {
-  return btoa(input) === ENCODED_PW;
-}
+// Encoded passwords
+const ENCODED_FM_PW = btoa('MindX@2026');
+const ENCODED_ADMIN_PW = btoa('Admin@123');
 
-function showPasswordModal(targetView) {
-  const modal = document.getElementById('pw-modal');
-  if (!modal) return;
-  modal.dataset.targetView = targetView;
-  modal.classList.add('show');
-  const inp = document.getElementById('pw-input');
-  if (inp) { inp.value = ''; inp.focus(); }
-  const errEl = document.getElementById('pw-error');
-  if (errEl) errEl.style.display = 'none';
-}
+// Session flags
+let cmAccess = false;
+let fmAccess = false;
+let adminAccess = false;
 
-function closePasswordModal() {
-  const modal = document.getElementById('pw-modal');
-  if (modal) modal.classList.remove('show');
-}
+// CM login info
+let cmLoginMSNV = '';
+let cmLoginName = '';
+let cmLoginBU = '';
 
-function submitPassword() {
-  const inp = document.getElementById('pw-input');
-  const pw = inp ? inp.value : '';
-  if (checkPassword(pw)) {
-    accessGranted = true;
-    closePasswordModal();
-    const targetView = document.getElementById('pw-modal').dataset.targetView;
-    navigate(targetView);
-  } else {
-    const errEl = document.getElementById('pw-error');
-    if (errEl) { errEl.textContent = 'Sai mật khẩu. Vui lòng thử lại.'; errEl.style.display = 'block'; }
-    if (inp) { inp.value = ''; inp.focus(); }
+// ---- MSNV → BU static mapping (CM fallback) ----
+const CM_STAFF_MAP = {
+  'I1373': { name: 'Khấu Thị Như', bu: 'HCM1 - PVT' },
+  'I1952': { name: 'Đỗ Linh Chi', bu: 'HCM1 - PXL' },
+  'I1637': { name: 'Nguyễn Thị Thanh Thúý', bu: 'HCM1 - TK' },
+  'I1913': { name: 'Lê Thị Thúy Nga', bu: 'HCM2 - LVV' },
+  'I0537': { name: 'Trần Thị Hồng Ngân', bu: 'HCM2 - NX' },
+  'I1857': { name: 'Võ Thị Kim Thoa', bu: 'HCM2 - PVD' },
+  'I1682': { name: 'Đoàn Nhật Quang', bu: 'HCM2 - SH' },
+  'I0592': { name: 'Lê Thị Hoài', bu: 'HCM3 - 3T2' },
+  'I0790': { name: 'Hoàng Trương Anh Tú', bu: 'HCM3 - HL' },
+  'I0491': { name: 'Nguyễn Thị Bích Phượng', bu: 'HCM3 - HTLO' },
+  'I2152': { name: 'Phạm Thị Mỹ Duyên', bu: 'HCM3 - PMH' },
+  'I1752': { name: 'Huỳnh Thanh Thảo', bu: 'HCM3 - PNL' },
+  'I0375': { name: 'Nguyễn Khả Kỳ', bu: 'HCM4 - LBB' },
+  'I4044': { name: 'Nguyễn Thành Vinh', bu: 'HCM4 - TC' },
+  'I1817': { name: 'Dương Thị Thu Huệ', bu: 'HCM4 - TL' },
+  'I0984': { name: 'Nguyễn Quốc Cường', bu: 'HCM4 - TT' },
+  'I1852': { name: 'Bùi Thuýy An', bu: 'HN - MK' },
+  'I3441': { name: 'Lê Thu Thủy', bu: 'HN - NHT' },
+  'I4334': { name: 'Đàm Thị Hoa', bu: 'HN - NHT' },
+  'I2252': { name: 'Lại Duy Tân Anh', bu: 'HN - NVC' },
+  'I3811': { name: 'Bùi Thủy Tiên', bu: 'HN - OCP' },
+  'I4337': { name: 'Chu Hồng Phong', bu: 'HN - TP' },
+  'I2515': { name: 'Đặng Thị Hồng Ngọc', bu: 'HN - VP' },
+  'I0574': { name: 'Đào Thùy Linh', bu: 'HN - HĐT' },
+  'I1496': { name: 'Đặng Xuân Thủy', bu: 'HN - VHHN' },
+  'I0700': { name: 'Nguyễn Thị Thu Hằng', bu: 'HN - NCT' },
+  'I1569': { name: 'Trần Thị Vui', bu: 'HN - NPS' },
+  'I1593': { name: 'Trần Thị Hải Yến', bu: 'MB1 - BN' },
+  'I3963': { name: 'Nguyễn Thị Kim Huệ', bu: 'MB1 - TS' },
+  'I2456': { name: 'Triệu Thị Bích Ngà', bu: 'MB1 - HP' },
+  'I1459': { name: 'Nguyễn Thị Hậu', bu: 'MB1 - QN' },
+  'I4372': { name: 'Vũ Đức Anh', bu: 'MB2 - PT' },
+  'I4355': { name: 'Nông Văn Thân', bu: 'MB2 - VP' },
+  'I1447': { name: 'Nguyễn Trung Duy', bu: 'MN - BH - PVT' },
+  'I3587': { name: 'Nguyễn Nhựt Tường', bu: 'MN - CT - THD' },
+  'I2692': { name: 'Nguyễn Thị Thuýy Linh', bu: 'MN - BD - DA' },
+  'I1540': { name: 'Nguyễn Xuân Trung', bu: 'MN - BD - TA' },
+  'I3042': { name: 'Lương Hoàng Vy', bu: 'MN - BD - TDM' },
+  'I2373': { name: 'Trần Thanh Kim Quỳnh', bu: 'MN - VT - LHP' },
+  'I2670': { name: 'Lê Thị Việt Trinh', bu: 'MT - ĐN' },
+  'I2564': { name: 'Lê Thị Thảo', bu: 'MT - TH' },
+  'I2162': { name: 'Trương Thị Ngọc Anh', bu: 'K18 - HCM' },
+  'I2700': { name: 'STL Art', bu: 'ONL - ART' },
+  'I0246': { name: 'STL Coding', bu: 'ONL - COD' }
+};
+
+// Dynamic staff map loaded from API (all Active staff)
+let dynamicStaffMap = null;
+let staffMapLoaded = false;
+
+/**
+ * Load staff list from API and build dynamic MSNV→BU map.
+ * Falls back to static CM_STAFF_MAP if API fails.
+ */
+async function loadStaffMap() {
+  if (staffMapLoaded) return;
+  try {
+    const data = await apiFetch('get_staff_list');
+    if (data && Array.isArray(data) && data.length > 0) {
+      dynamicStaffMap = {};
+      data.forEach(s => {
+        if (s.msnv) {
+          dynamicStaffMap[s.msnv.toUpperCase()] = {
+            name: s.name || '',
+            bu: s.bu_app || '',
+            position: s.position || '',
+            region: s.region || '',
+            bu_raw: s.bu_raw || ''
+          };
+        }
+      });
+      staffMapLoaded = true;
+    }
+  } catch (e) {
+    console.warn('Could not load staff list from API, using static fallback:', e.message);
   }
 }
 
+/**
+ * Lookup MSNV in dynamic map first, then static CM_STAFF_MAP fallback.
+ * Returns { name, bu } or null if not found.
+ */
+function lookupStaff(msnv) {
+  const key = msnv.toUpperCase().trim();
+  // Try dynamic map first
+  if (dynamicStaffMap && dynamicStaffMap[key]) {
+    const s = dynamicStaffMap[key];
+    // Check if BU exists in BU_LIST
+    if (s.bu && BU_LIST.includes(s.bu)) {
+      return { name: s.name, bu: s.bu };
+    }
+    // BU not in BU_LIST — return null with special flag
+    return { name: s.name, bu: s.bu, buNotInList: !BU_LIST.includes(s.bu) };
+  }
+  // Try static CM map
+  if (CM_STAFF_MAP[key]) {
+    return { name: CM_STAFF_MAP[key].name, bu: CM_STAFF_MAP[key].bu };
+  }
+  return null;
+}
+
+// ---- Restore session from sessionStorage ----
+function restoreSession() {
+  // CM session
+  const savedMSNV = sessionStorage.getItem('cm_msnv');
+  const savedBU = sessionStorage.getItem('cm_bu');
+  const savedName = sessionStorage.getItem('cm_name');
+  if (savedMSNV && savedBU) {
+    cmAccess = true;
+    cmLoginMSNV = savedMSNV;
+    cmLoginBU = savedBU;
+    cmLoginName = savedName || '';
+  }
+  // FM session
+  if (sessionStorage.getItem('fm_access') === '1') {
+    fmAccess = true;
+  }
+  // Admin session
+  if (sessionStorage.getItem('admin_access') === '1') {
+    adminAccess = true;
+  }
+}
+
+// ---- Auth modal state ----
+let authModalMode = ''; // 'cm', 'fm', 'admin'
+let authModalTargetView = '';
+
+function showAuthModal(mode, targetView) {
+  const modal = document.getElementById('auth-modal');
+  if (!modal) return;
+  authModalMode = mode;
+  authModalTargetView = targetView;
+
+  const titleEl = document.getElementById('auth-modal-title');
+  const descEl = document.getElementById('auth-modal-desc');
+  const inp = document.getElementById('auth-input');
+  const errEl = document.getElementById('auth-error');
+  const footerEl = document.getElementById('auth-modal-footer');
+  const iconEl = document.getElementById('auth-modal-icon');
+
+  if (errEl) errEl.style.display = 'none';
+  if (footerEl) footerEl.innerHTML = '';
+  if (inp) { inp.value = ''; }
+
+  if (mode === 'cm') {
+    titleEl.textContent = 'Đăng nhập CM';
+    descEl.textContent = 'Nhập mã nhân viên để truy cập';
+    inp.type = 'text';
+    inp.placeholder = 'Mã nhân viên (VD: I1234)';
+    iconEl.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cc0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+  } else if (mode === 'fm') {
+    titleEl.textContent = 'Truy cập FM Dashboard';
+    descEl.textContent = 'Dành cho FM/SOD';
+    inp.type = 'password';
+    inp.placeholder = 'Nhập mật khẩu...';
+    iconEl.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cc0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+  } else if (mode === 'admin') {
+    titleEl.textContent = 'Truy cập Cấu hình';
+    descEl.textContent = 'Dành cho Admin';
+    inp.type = 'password';
+    inp.placeholder = 'Nhập mật khẩu...';
+    iconEl.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cc0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  }
+
+  modal.classList.add('show');
+  if (inp) setTimeout(() => inp.focus(), 100);
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById('auth-modal');
+  if (modal) modal.classList.remove('show');
+  authModalMode = '';
+  authModalTargetView = '';
+}
+
+function submitAuth() {
+  const inp = document.getElementById('auth-input');
+  const val = inp ? inp.value.trim() : '';
+  const errEl = document.getElementById('auth-error');
+
+  if (!val) {
+    if (errEl) { errEl.textContent = 'Vui lòng nhập thông tin.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  if (authModalMode === 'cm') {
+    // Validate MSNV
+    const staff = lookupStaff(val);
+    if (!staff) {
+      if (errEl) { errEl.textContent = 'Mã nhân viên không hợp lệ'; errEl.style.display = 'block'; }
+      if (inp) { inp.value = ''; inp.focus(); }
+      return;
+    }
+    if (staff.buNotInList) {
+      if (errEl) { errEl.textContent = 'BU của bạn ("' + (staff.bu || 'không xác định') + '") chưa được cấu hình trong hệ thống. Vui lòng liên hệ Admin.'; errEl.style.display = 'block'; }
+      if (inp) { inp.value = ''; inp.focus(); }
+      return;
+    }
+    // Success — CM login
+    cmAccess = true;
+    cmLoginMSNV = val.toUpperCase().trim();
+    cmLoginBU = staff.bu;
+    cmLoginName = staff.name;
+    sessionStorage.setItem('cm_msnv', cmLoginMSNV);
+    sessionStorage.setItem('cm_bu', cmLoginBU);
+    sessionStorage.setItem('cm_name', cmLoginName);
+    closeAuthModal();
+    applyCMLogin();
+    navigate(authModalTargetView);
+
+  } else if (authModalMode === 'fm') {
+    if (btoa(val) === ENCODED_FM_PW) {
+      fmAccess = true;
+      sessionStorage.setItem('fm_access', '1');
+      closeAuthModal();
+      navigate(authModalTargetView);
+    } else {
+      if (errEl) { errEl.textContent = 'Mật khẩu không đúng'; errEl.style.display = 'block'; }
+      if (inp) { inp.value = ''; inp.focus(); }
+    }
+
+  } else if (authModalMode === 'admin') {
+    if (btoa(val) === ENCODED_ADMIN_PW) {
+      adminAccess = true;
+      sessionStorage.setItem('admin_access', '1');
+      closeAuthModal();
+      navigate(authModalTargetView);
+    } else {
+      if (errEl) { errEl.textContent = 'Mật khẩu không đúng'; errEl.style.display = 'block'; }
+      if (inp) { inp.value = ''; inp.focus(); }
+    }
+  }
+}
+
+/**
+ * Apply CM login: set BU, lock selector, update header badge.
+ */
+function applyCMLogin() {
+  if (!cmLoginBU) return;
+
+  // Set CM BU selector
+  const buSel = document.getElementById('cm-bu');
+  if (buSel) {
+    buSel.value = cmLoginBU;
+    buSel.classList.add('bu-locked');
+    buSel.title = cmLoginName + ' (' + cmLoginMSNV + ')';
+  }
+
+  // Also set daily BU
+  const dailyBuSel = document.getElementById('daily-bu');
+  if (dailyBuSel) {
+    dailyBuSel.value = cmLoginBU;
+    dailyBuSel.classList.add('bu-locked');
+  }
+
+  // Update state
+  state.cm.bu = cmLoginBU;
+  state.daily.bu = cmLoginBU;
+
+  // Update header badge
+  updateHeaderBadge();
+
+  // Trigger data load
+  onCMSelectionChange();
+}
+
+function updateHeaderBadge() {
+  // Remove existing badge
+  const existing = document.getElementById('header-user-badge');
+  if (existing) existing.remove();
+
+  if (!cmAccess && !fmAccess) return;
+
+  const badge = document.createElement('div');
+  badge.id = 'header-user-badge';
+  badge.className = 'header-user-badge';
+
+  let label = '';
+  if (cmAccess && cmLoginName) {
+    label = cmLoginName + ' (' + cmLoginMSNV + ')';
+  } else if (fmAccess) {
+    label = 'FM/SOD';
+  }
+
+  badge.innerHTML = '<span class="badge-dot"></span><span class="badge-label">' + escHtml(label) + '</span>';
+  badge.title = 'Nhấn để đăng xuất';
+  badge.onclick = handleLogout;
+
+  const spacer = document.querySelector('.header-spacer');
+  if (spacer) spacer.parentNode.insertBefore(badge, spacer);
+}
+
+function handleLogout() {
+  if (!confirm('Đăng xuất khỏi hệ thống?')) return;
+  sessionStorage.removeItem('cm_msnv');
+  sessionStorage.removeItem('cm_bu');
+  sessionStorage.removeItem('cm_name');
+  sessionStorage.removeItem('fm_access');
+  sessionStorage.removeItem('admin_access');
+  cmAccess = false;
+  fmAccess = false;
+  adminAccess = false;
+  cmLoginMSNV = '';
+  cmLoginBU = '';
+  cmLoginName = '';
+
+  // Unlock BU selectors
+  const buSel = document.getElementById('cm-bu');
+  if (buSel) { buSel.classList.remove('bu-locked'); buSel.title = ''; }
+  const dailyBuSel = document.getElementById('daily-bu');
+  if (dailyBuSel) { dailyBuSel.classList.remove('bu-locked'); }
+
+  // Remove badge
+  const badge = document.getElementById('header-user-badge');
+  if (badge) badge.remove();
+
+  navigate('landing');
+  showToast('Đã đăng xuất', 'info');
+}
+
+// Legacy compatibility
+let accessGranted = false; // kept for any external references
+function showPasswordModal(v) { /* noop — replaced by showAuthModal */ }
+function closePasswordModal() { /* noop */ }
+function submitPassword() { /* noop */ }
+
 // ===================== ROUTING =====================
 function navigate(view) {
-  // Kiểm tra mật khẩu cho dashboard và config
-  if (ACCESS_PROTECTED_VIEWS.includes(view) && !accessGranted) {
-    showPasswordModal(view);
+  // 3-tier access check
+  if (ACCESS_CM_VIEWS.includes(view) && !cmAccess) {
+    showAuthModal('cm', view);
+    return;
+  }
+  if (ACCESS_FM_VIEWS.includes(view) && !fmAccess) {
+    showAuthModal('fm', view);
+    return;
+  }
+  if (ACCESS_ADMIN_VIEWS.includes(view) && !adminAccess) {
+    showAuthModal('admin', view);
     return;
   }
 
@@ -2406,6 +2723,9 @@ function exportCSV() {
 
 // ===================== INIT =====================
 function init() {
+  // Restore 3-tier session BEFORE anything else
+  restoreSession();
+
   populateSelects();
   initTabs();
 
@@ -2416,6 +2736,11 @@ function init() {
   // Render tất cả bảng
   renderAPTable();
   renderWRTable();
+
+  // Apply CM login if session was restored
+  if (cmAccess && cmLoginBU) {
+    applyCMLogin();
+  }
 
   // Routing
   initRouting();
@@ -2443,6 +2768,9 @@ function init() {
   if (!isConfigured()) {
     showSetupBanner();
   }
+
+  // Load dynamic staff map in background (non-blocking)
+  loadStaffMap();
 
   // Tải dữ liệu CM nếu đang ở view CM
   if (state.currentView === 'cm') loadCMData();
