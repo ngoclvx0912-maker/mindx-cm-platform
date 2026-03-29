@@ -5300,9 +5300,27 @@ async function loadDailyOps() {
 
     if (loading) loading.style.display = 'none';
 
+    // Alias mapping: cột cũ → cột mới (backward compat khi Sheet vẫn dùng tên cũ)
+    const FIELD_ALIASES = {
+      cs_touchpoint: 'calls_cskh',
+      phhs_reupsell: 'lead_referral',
+      trial_done_n1: 'trial_mkt'
+    };
+    function applyAliases(rows) {
+      return rows.map(row => {
+        const r = Object.assign({}, row);
+        Object.entries(FIELD_ALIASES).forEach(([oldKey, newKey]) => {
+          if (r[oldKey] !== undefined && (r[newKey] === undefined || r[newKey] === 0 || r[newKey] === '0' || r[newKey] === '')) {
+            r[newKey] = r[oldKey];
+          }
+        });
+        return r;
+      });
+    }
+
     if (allData.length > 0) {
-      state.dailyOps.rawData = allData;
-      state.dailyOps._prevData = prevData || [];
+      state.dailyOps.rawData = applyAliases(allData);
+      state.dailyOps._prevData = applyAliases(prevData || []);
       if (content) content.style.display = '';
       renderDailyOps();
     } else {
@@ -5380,8 +5398,13 @@ function computeDopsums(rows, buFilter) {
   ['N1', 'N2', 'N3'].forEach(g => {
     const leads = fields.filter(f => f.group === g && (f.role === 'lead' || f.role === 'referral_lead'))
       .reduce((sum, f) => sum + (s[f.id] || 0), 0);
-    const trials = fields.filter(f => f.group === g && f.role === 'trial')
+    // Trial: dùng role 'trial' trước, nếu = 0 thì fallback sang 'trial_book'
+    let trials = fields.filter(f => f.group === g && f.role === 'trial')
       .reduce((sum, f) => sum + (s[f.id] || 0), 0);
+    if (trials === 0) {
+      trials = fields.filter(f => f.group === g && f.role === 'trial_book')
+        .reduce((sum, f) => sum + (s[f.id] || 0), 0);
+    }
     const deals = cleanDeals[g] || 0;
     const rev = revByGroup[g] || 0;
     crByGroup[g] = {
@@ -5516,17 +5539,47 @@ function renderDailyOps() {
     });
     renderDopsSection(`dops-metrics-${group.toLowerCase()}`, metrics);
 
-    // CR strip for this group
+    // CR strip for this group — custom per group
     const gCR = cur.crByGroup[group] || {};
     const pCR = prev ? (prev.crByGroup[group] || {}) : null;
-    const crChips = [
-      { label: `CR16 (${group})`, value: gCR.cr16 || 0, rawPrev: pCR ? pCR.cr16 : null,
-        bench: 15, benchLabel: 'BM: 15%' },
-      { label: `CR46 (${group})`, value: gCR.cr46 || 0, rawPrev: pCR ? pCR.cr46 : null,
-        bench: 50, benchLabel: 'BM: 50%' },
-      { label: `AOV (${group})`, value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
-        suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
-    ];
+    let crChips = [];
+
+    if (group === 'N1') {
+      // N1: CR16 = Deal/Lead, CR46 = Deal/Trial (trial_mkt hoặc trial_book nếu trial_mkt=0)
+      const cr46Val = gCR.cr46 || 0;
+      crChips = [
+        { label: 'CR16 (N1)', value: gCR.cr16 || 0, rawPrev: pCR ? pCR.cr16 : null,
+          bench: 15, benchLabel: 'BM: 15%' },
+        { label: 'CR46 (N1)', value: cr46Val, rawPrev: pCR ? pCR.cr46 : null,
+          bench: 50, benchLabel: 'BM: 50%' },
+        { label: 'AOV (N1)', value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
+          suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
+      ];
+    } else if (group === 'N2') {
+      // N2: Chỉ CR26 Refer = L6 Referral / L2 Referral + AOV
+      const l2ref = s[fields.find(f => f.group === 'N2' && f.role === 'referral_lead')?.id] || 0;
+      const l6ref = cur.cleanDealsByField['deal_referral'] || 0;
+      const cr26 = l2ref > 0 ? (l6ref / l2ref * 100) : 0;
+      const prevL2ref = prev ? (prev.raw[fields.find(f => f.group === 'N2' && f.role === 'referral_lead')?.id] || 0) : 0;
+      const prevL6ref = prev ? (prev.cleanDealsByField['deal_referral'] || 0) : 0;
+      const prevCr26 = prevL2ref > 0 ? (prevL6ref / prevL2ref * 100) : 0;
+      crChips = [
+        { label: 'CR26 Refer', value: cr26, rawPrev: prev ? prevCr26 : null,
+          bench: null },
+        { label: 'AOV (N2)', value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
+          suffix: 'AOV', bench: null }
+      ];
+    } else if (group === 'N3') {
+      // N3: CR16, CR46, AOV
+      crChips = [
+        { label: 'CR16 (N3)', value: gCR.cr16 || 0, rawPrev: pCR ? pCR.cr16 : null,
+          bench: 15, benchLabel: 'BM: 15%' },
+        { label: 'CR46 (N3)', value: gCR.cr46 || 0, rawPrev: pCR ? pCR.cr46 : null,
+          bench: 50, benchLabel: 'BM: 50%' },
+        { label: 'AOV (N3)', value: gCR.aov || 0, rawPrev: pCR ? pCR.aov : null,
+          suffix: 'AOV', bench: 18, benchLabel: 'BM: 18M' }
+      ];
+    }
     renderCRStrip(`dops-cr-${group.toLowerCase()}`, crChips);
   });
 
