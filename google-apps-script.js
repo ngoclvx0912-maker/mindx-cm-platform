@@ -32,9 +32,9 @@ const HEADERS = {
   ],
   DAILY: [
     'bu', 'date',
-    'lead_mkt', 'calls_n1', 'trial_book', 'trial_done_n1', 'deal_n1', 'revenue_n1',
-    'cs_touchpoint', 'phhs_reupsell', 'deal_reupsell', 'deal_referral', 'revenue_n2',
-    'direct_sales', 'events', 'lead_n3', 'trial_n3', 'deal_n3', 'revenue_n3',
+    'lead_mkt', 'calls_n1', 'trial_book', 'trial_mkt', 'deal_n1', 'revenue_n1',
+    'calls_cskh', 'deal_reupsell', 'lead_referral', 'deal_referral', 'revenue_n2',
+    'lead_n3', 'calls_n3', 'direct_sales', 'trial_book_n3', 'trial_n3', 'deal_n3', 'revenue_n3',
     'note', 'saved_at'
   ]
 };
@@ -1430,22 +1430,21 @@ function extractBUDataForMiMi(bu, month, week) {
 // Format Daily Report data cho MiMi (single BU)
 function formatDailyForMiMi(rows, bu) {
   var lines = ['DAILY REPORT MTD cho ' + bu + ' (' + rows.length + ' ng\u00e0y):'];
-  var sums = { lead_mkt:0, calls_n1:0, trial_book:0, trial_done_n1:0, deal_n1:0, revenue_n1:0,
-    cs_touchpoint:0, phhs_reupsell:0, deal_reupsell:0, deal_referral:0, revenue_n2:0,
-    direct_sales:0, events:0, lead_n3:0, trial_n3:0, deal_n3:0, revenue_n3:0 };
+  var sums = { lead_mkt:0, calls_n1:0, trial_mkt:0, deal_n1:0, revenue_n1:0,
+    calls_cskh:0, deal_reupsell:0, lead_referral:0, deal_referral:0, revenue_n2:0,
+    lead_n3:0, calls_n3:0, trial_n3:0, deal_n3:0, revenue_n3:0 };
   rows.forEach(function(r) {
     for (var k in sums) sums[k] += parseInt(r[k]) || 0;
   });
   var totalDeal = sums.deal_n1 + sums.deal_reupsell + sums.deal_referral + sums.deal_n3;
   var totalRev = sums.revenue_n1 + sums.revenue_n2 + sums.revenue_n3;
   lines.push('T\u1ed5ng Deal MTD: ' + totalDeal + ' | Doanh s\u1ed1 MTD: ' + totalRev + 'M');
-  lines.push('N1: Lead=' + sums.lead_mkt + ', Calls=' + sums.calls_n1 + ', Trial Book=' + sums.trial_book + ', Trial Done=' + sums.trial_done_n1 + ', Deal=' + sums.deal_n1 + ', Rev=' + sums.revenue_n1 + 'M');
+  lines.push('N1: Lead=' + sums.lead_mkt + ', Calls=' + sums.calls_n1 + ', Trial MKT=' + sums.trial_mkt + ', Deal=' + sums.deal_n1 + ', Rev=' + sums.revenue_n1 + 'M');
   var cr16_n1 = sums.lead_mkt > 0 ? (sums.deal_n1/sums.lead_mkt*100).toFixed(1) : '0';
-  var cr46_n1 = sums.trial_done_n1 > 0 ? (sums.deal_n1/sums.trial_done_n1*100).toFixed(1) : '0';
-  var noshow = sums.trial_book > 0 ? ((1-sums.trial_done_n1/sums.trial_book)*100).toFixed(1) : '0';
-  lines.push('CR16(N1)=' + cr16_n1 + '% | CR46(N1)=' + cr46_n1 + '% | No-show=' + noshow + '%');
-  lines.push('N2: CS touchpoint=' + sums.cs_touchpoint + ', PHHS t\u01b0 v\u1ea5n=' + sums.phhs_reupsell + ', Deal ReUpsell=' + sums.deal_reupsell + ', Deal Referral=' + sums.deal_referral + ', Rev=' + sums.revenue_n2 + 'M');
-  lines.push('N3: Direct=' + sums.direct_sales + ', Events=' + sums.events + ', Lead=' + sums.lead_n3 + ', Trial=' + sums.trial_n3 + ', Deal=' + sums.deal_n3 + ', Rev=' + sums.revenue_n3 + 'M');
+  var cr46_n1 = sums.trial_mkt > 0 ? (sums.deal_n1/sums.trial_mkt*100).toFixed(1) : '0';
+  lines.push('CR16(N1)=' + cr16_n1 + '% | CR46(N1)=' + cr46_n1 + '%');
+  lines.push('N2: Calls CSKH=' + sums.calls_cskh + ', Deal ReUpsell=' + sums.deal_reupsell + ', Lead Referral=' + sums.lead_referral + ', Deal Referral=' + sums.deal_referral + ', Rev=' + sums.revenue_n2 + 'M');
+  lines.push('N3: Calls=' + sums.calls_n3 + ', Lead=' + sums.lead_n3 + ', Trial=' + sums.trial_n3 + ', Deal=' + sums.deal_n3 + ', Rev=' + sums.revenue_n3 + 'M');
   return lines.join('\n');
 }
 
@@ -1455,9 +1454,9 @@ function formatDailySystemForMiMi(rows) {
   rows.forEach(function(r) { buSet[r.bu] = true; });
   var buCount = Object.keys(buSet).length;
   var lines = ['DAILY REPORT TO\u00c0N H\u1ec6 TH\u1ed0NG (' + buCount + ' BU, ' + rows.length + ' b\u1ea3n ghi):'];
-  var sums = { lead_mkt:0, calls_n1:0, trial_book:0, trial_done_n1:0, deal_n1:0, revenue_n1:0,
-    cs_touchpoint:0, phhs_reupsell:0, deal_reupsell:0, deal_referral:0, revenue_n2:0,
-    direct_sales:0, events:0, lead_n3:0, trial_n3:0, deal_n3:0, revenue_n3:0 };
+  var sums = { lead_mkt:0, calls_n1:0, trial_mkt:0, deal_n1:0, revenue_n1:0,
+    calls_cskh:0, deal_reupsell:0, lead_referral:0, deal_referral:0, revenue_n2:0,
+    lead_n3:0, calls_n3:0, trial_n3:0, deal_n3:0, revenue_n3:0 };
   rows.forEach(function(r) {
     for (var k in sums) sums[k] += parseInt(r[k]) || 0;
   });
@@ -1465,8 +1464,8 @@ function formatDailySystemForMiMi(rows) {
   var totalRev = sums.revenue_n1 + sums.revenue_n2 + sums.revenue_n3;
   lines.push('T\u1ed5ng Deal: ' + totalDeal + ' | T\u1ed5ng Doanh s\u1ed1: ' + totalRev + 'M');
   lines.push('N1: Lead=' + sums.lead_mkt + ', Deal=' + sums.deal_n1 + ', Rev=' + sums.revenue_n1 + 'M, CR16=' + (sums.lead_mkt>0?(sums.deal_n1/sums.lead_mkt*100).toFixed(1):'0') + '%');
-  lines.push('N2: CS=' + sums.cs_touchpoint + ', Deal ReUp=' + sums.deal_reupsell + ', Deal Ref=' + sums.deal_referral + ', Rev=' + sums.revenue_n2 + 'M');
-  lines.push('N3: Direct=' + sums.direct_sales + ', Events=' + sums.events + ', Deal=' + sums.deal_n3 + ', Rev=' + sums.revenue_n3 + 'M');
+  lines.push('N2: CSKH=' + sums.calls_cskh + ', Deal ReUp=' + sums.deal_reupsell + ', Lead Ref=' + sums.lead_referral + ', Deal Ref=' + sums.deal_referral + ', Rev=' + sums.revenue_n2 + 'M');
+  lines.push('N3: Calls=' + sums.calls_n3 + ', Lead=' + sums.lead_n3 + ', Deal=' + sums.deal_n3 + ', Rev=' + sums.revenue_n3 + 'M');
   return lines.join('\n');
 }
 
