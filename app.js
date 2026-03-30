@@ -180,7 +180,8 @@ const DAILY_FIELDS = DEFAULT_DAILY_FIELDS;
 // Ánh xạ tên cột cũ → tên cột mới (backward compat khi Sheet vẫn dùng tên cũ)
 const FIELD_ALIASES = {
   cs_touchpoint: 'calls_cskh',
-  phhs_reupsell: 'lead_referral',
+  // phhs_reupsell KHÔNG map sang lead_referral vì khác nghĩa
+  // (PHHS tư vấn Re/Upsell ≠ L2 Referral)
   trial_done_n1: 'trial_mkt'
 };
 
