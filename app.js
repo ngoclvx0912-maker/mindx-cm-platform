@@ -5355,7 +5355,7 @@ async function loadDailyMTD() {
         if (groupFields.length === 0) return;
         html += `<div class="daily-mtd-group"><div class="daily-mtd-group-title">${gc.title}</div>`;
         groupFields.forEach(f => {
-          const val = f.role === 'revenue' ? `${sums[f.id] || 0}M` : (sums[f.id] || 0);
+          const val = f.role === 'revenue' ? fmtRev(sums[f.id] || 0) : (sums[f.id] || 0);
           html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">${escHtml(f.label)}</span><span class="daily-mtd-item-value">${val}</span></div>`;
         });
         html += '</div>';
@@ -5371,7 +5371,7 @@ async function loadDailyMTD() {
       html += '<div class="daily-mtd-group daily-mtd-group-kpi"><div class="daily-mtd-group-title">CHỆ SỐ TỰ TÍNH</div>';
       html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">CR16 (Deal N1 / Lead N1)</span><span class="daily-mtd-item-value">${cr16.toFixed(1)}%</span></div>`;
       html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">CR46 (Deal N1 / Trial N1)</span><span class="daily-mtd-item-value">${cr46.toFixed(1)}%</span></div>`;
-      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">AOV N1 (DS N1 / Deal N1)</span><span class="daily-mtd-item-value">${aov.toFixed(1)}M</span></div>`;
+      html += `<div class="daily-mtd-item"><span class="daily-mtd-item-label">AOV N1 (DS N1 / Deal N1)</span><span class="daily-mtd-item-value">${fmtRev(aov)}</span></div>`;
       html += '</div>';
 
       content.innerHTML = html;
@@ -5929,7 +5929,9 @@ function fmtDops(value, type) {
   return String(v);
 }
 
-/** Short number formatter for analytics: auto K/M/B */
+/** Short number formatter for analytics: auto K/M/B
+ *  Input: raw count (123456 → 123.5K, 1234567 → 1.2M)
+ */
 function fmtN(v) {
   const n = Number(v) || 0;
   if (Math.abs(n) >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
@@ -5939,12 +5941,18 @@ function fmtN(v) {
   return String(n);
 }
 
-/** Format revenue (input in triệu) to M/B display */
+/** Format revenue: input là VNĐ thô → hiển thị triệu/tỷ
+ *  527940495 → 528M | 6921209000 → 6.9B | 50000000 → 50M
+ */
 function fmtRev(v) {
   const n = Number(v) || 0;
-  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'B';
-  if (Math.abs(n) >= 100) return Math.round(n) + 'M';
-  return n.toFixed(1) + 'M';
+  const m = n / 1e6; // VNĐ → triệu
+  if (Math.abs(m) >= 1000) return (m / 1000).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (Math.abs(m) >= 100) return Math.round(m).toLocaleString('en-US') + 'M';
+  if (Math.abs(m) >= 10) return m.toFixed(1).replace(/\.0$/, '') + 'M';
+  if (Math.abs(m) >= 1) return m.toFixed(1) + 'M';
+  if (n === 0) return '0';
+  return m.toFixed(2) + 'M';
 }
 
 // ============================================================
@@ -6325,13 +6333,13 @@ function renderCMAnalytics() {
       <div class="ana-fc-grid">
         <div class="ana-fc-card">
           <div class="ana-fc-label">Deal dự báo EOM</div>
-          <div class="ana-fc-value">${forecastDeal}</div>
+          <div class="ana-fc-value">${fmtN(forecastDeal)}</div>
           <div class="ana-fc-sub">Hiện tại: ${totalDeals} / ${daysPassed} ngày</div>
         </div>
         <div class="ana-fc-card">
           <div class="ana-fc-label">Doanh số dự báo EOM</div>
-          <div class="ana-fc-value ana-fc-good">${forecastRev}M</div>
-          <div class="ana-fc-sub">Hiện tại: ${totalRev}M</div>
+          <div class="ana-fc-value ana-fc-good">${fmtRev(forecastRev)}</div>
+          <div class="ana-fc-sub">Hiện tại: ${fmtRev(totalRev)}</div>
         </div>
         <div class="ana-fc-card">
           <div class="ana-fc-label">Nếu tăng Calls đạt BM</div>
@@ -6391,7 +6399,7 @@ function renderCMAnalytics() {
             <span class="ana-top-metric">Trial: <strong>${b.trial.toFixed(1)}/d</strong></span>
             <span class="ana-top-metric">CSKH: <strong>${b.cskh.toFixed(1)}/d</strong></span>
             <span class="ana-top-metric">Deal: <strong>${b.deals.toFixed(1)}/d</strong></span>
-            <span class="ana-top-metric">Rev: <strong>${b.rev.toFixed(0)}M/d</strong></span>
+            <span class="ana-top-metric">Rev: <strong>${fmtRev(b.rev)}/d</strong></span>
             <span class="ana-top-metric">CR16: <strong>${b.cr16.toFixed(1)}%</strong></span>
           </div>
         </div>`;
@@ -6407,7 +6415,7 @@ function renderCMAnalytics() {
               <span class="ana-top-metric">Trial: <strong>${currentBU.trial.toFixed(1)}/d</strong></span>
               <span class="ana-top-metric">CSKH: <strong>${currentBU.cskh.toFixed(1)}/d</strong></span>
               <span class="ana-top-metric">Deal: <strong>${currentBU.deals.toFixed(1)}/d</strong></span>
-              <span class="ana-top-metric">Rev: <strong>${currentBU.rev.toFixed(0)}M/d</strong></span>
+              <span class="ana-top-metric">Rev: <strong>${fmtRev(currentBU.rev)}/d</strong></span>
               <span class="ana-top-metric">CR16: <strong>${currentBU.cr16.toFixed(1)}%</strong></span>
             </div>
           </div>`;
@@ -7224,13 +7232,13 @@ function renderAnalytics() {
       <div class="ana-fc-grid">
         <div class="ana-fc-card">
           <div class="ana-fc-label">Deal d\u1EF1 b\u00E1o EOM</div>
-          <div class="ana-fc-value">${forecastDeal}</div>
+          <div class="ana-fc-value">${fmtN(forecastDeal)}</div>
           <div class="ana-fc-sub">Hi\u1EC7n t\u1EA1i: ${totalDeals} / ${daysPassed} ng\u00E0y</div>
         </div>
         <div class="ana-fc-card">
           <div class="ana-fc-label">Doanh s\u1ED1 d\u1EF1 b\u00E1o EOM</div>
-          <div class="ana-fc-value ana-fc-good">${forecastRev}M</div>
-          <div class="ana-fc-sub">Hi\u1EC7n t\u1EA1i: ${totalRev}M</div>
+          <div class="ana-fc-value ana-fc-good">${fmtRev(forecastRev)}</div>
+          <div class="ana-fc-sub">Hi\u1EC7n t\u1EA1i: ${fmtRev(totalRev)}</div>
         </div>
         <div class="ana-fc-card">
           <div class="ana-fc-label">N\u1EBFu t\u0103ng Calls \u0111\u1EA1t BM</div>
@@ -7275,10 +7283,10 @@ function renderAnalytics() {
         return `<tr>
           <td>${s.bu}</td>
           <td>${fmtN(s.totalDeals)}</td>
-          <td>${s.totalRev}M<div class="cmp-bar-wrap"><div class="cmp-bar-fill" style="width:${revPct}%;background:var(--blue)"></div></div></td>
+          <td>${fmtRev(s.totalRev)}<div class="cmp-bar-wrap"><div class="cmp-bar-fill" style="width:${revPct}%;background:var(--blue)"></div></div></td>
           <td>${s.dealsPerDay.toFixed(1)}</td>
           <td>${fcDeal}</td>
-          <td><strong>${fcRev}M</strong><div class="cmp-bar-wrap"><div class="cmp-bar-fill" style="width:${fcRevPct}%;background:var(--green)"></div></div></td>
+          <td><strong>${fmtRev(fcRev)}</strong><div class="cmp-bar-wrap"><div class="cmp-bar-fill" style="width:${fcRevPct}%;background:var(--green)"></div></div></td>
         </tr>`;
       }).join('');
       rows += `<tr class="ana-cmp-summary-row">
@@ -7287,7 +7295,7 @@ function renderAnalytics() {
         <td>${fmtRev(totalRev)}</td>
         <td>${dailyDealRate.toFixed(1)}</td>
         <td>${forecastDeal}</td>
-        <td><strong>${forecastRev}M</strong></td>
+        <td><strong>${fmtRev(forecastRev)}</strong></td>
       </tr>`;
       fcCmpBody.innerHTML = `<table class="ana-cmp-table">
         <thead><tr>
@@ -7315,7 +7323,7 @@ function renderAnalytics() {
           <span class="ana-top-metric">Trial: <strong>${b.trial_mkt.toFixed(1)}/d</strong></span>
           <span class="ana-top-metric">CSKH: <strong>${b.cskh.toFixed(1)}/d</strong></span>
           <span class="ana-top-metric">Deal: <strong>${b.dealsPerDay.toFixed(1)}/d</strong></span>
-          <span class="ana-top-metric">Rev: <strong>${b.revPerDay.toFixed(0)}M/d</strong></span>
+          <span class="ana-top-metric">Rev: <strong>${fmtRev(b.revPerDay)}/d</strong></span>
           <span class="ana-top-metric">CR16: <strong>${b.cr16_n1.toFixed(1)}%</strong></span>
           <span class="ana-top-metric">CR46: <strong>${b.cr46_n1.toFixed(1)}%</strong></span>
         </div>
