@@ -555,12 +555,15 @@ function lookupStaff(msnv) {
   // Try dynamic map first
   if (dynamicStaffMap && dynamicStaffMap[key]) {
     const s = dynamicStaffMap[key];
-    // Check if BU exists in BU_LIST
     if (s.bu && BU_LIST.includes(s.bu)) {
       return { name: s.name, bu: s.bu };
     }
-    // BU not in BU_LIST — return null with special flag
-    return { name: s.name, bu: s.bu, buNotInList: !BU_LIST.includes(s.bu) };
+    // Dynamic BU không khớp BU_LIST → fallback về static map
+    if (CM_STAFF_MAP[key]) {
+      return { name: CM_STAFF_MAP[key].name, bu: CM_STAFF_MAP[key].bu };
+    }
+    // Vẫn có trong dynamic nhưng BU không hợp lệ → báo lỗi
+    return { name: s.name, bu: s.bu, buNotInList: true };
   }
   // Try static CM map
   if (CM_STAFF_MAP[key]) {
