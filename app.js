@@ -6081,7 +6081,7 @@ function renderCMAnalytics() {
   const n1_leads = _sum(filtered, 'lead_mkt');
   const n1_calls = _sum(filtered, 'calls_n1');
   const n1_trial_mkt = _sum(filtered, 'trial_mkt');
-  const n1_deals = _sum(filtered, 'deal_n1');
+  const n1_deals = _sumDeal(filtered, 'deal_n1');
   const n1_rev = _sum(filtered, 'revenue_n1');
   const n1_calls_avg = n1_calls / avgDays;
   const n1_trial_mkt_avg = n1_trial_mkt / avgDays;
@@ -6089,8 +6089,8 @@ function renderCMAnalytics() {
   // N2
   const n2_calls_cskh = _sum(filtered, 'calls_cskh');
   const n2_lead_ref = _sum(filtered, 'lead_referral');
-  const n2_deal_re = _sum(filtered, 'deal_reupsell');
-  const n2_deal_ref = _sum(filtered, 'deal_referral');
+  const n2_deal_re = _sumDeal(filtered, 'deal_reupsell');
+  const n2_deal_ref = _sumDeal(filtered, 'deal_referral');
   const n2_rev = _sum(filtered, 'revenue_n2');
   const n2_cskh_avg = n2_calls_cskh / avgDays;
 
@@ -6098,7 +6098,7 @@ function renderCMAnalytics() {
   const n3_leads = _sum(filtered, 'lead_n3');
   const n3_calls = _sum(filtered, 'calls_n3');
   const n3_trial = _sum(filtered, 'trial_n3');
-  const n3_deals = _sum(filtered, 'deal_n3');
+  const n3_deals = _sumDeal(filtered, 'deal_n3');
   const n3_rev = _sum(filtered, 'revenue_n3');
   const n3_calls_avg = n3_calls / avgDays;
 
@@ -6744,6 +6744,14 @@ async function loadAnalytics() {
 
 // === Helpers ===
 function _sum(rows, field) { return rows.reduce((s, r) => s + (parseInt(r[field]) || 0), 0); }
+
+/** Sum deal field with outlier filter: skip rows where value > 1000 (likely revenue in deal field) */
+function _sumDeal(rows, field) {
+  return rows.reduce((s, r) => {
+    const v = parseInt(r[field]) || 0;
+    return s + (v > 1000 ? 0 : v); // Skip outliers
+  }, 0);
+}
 function _pct(num, den) { return den > 0 ? (num / den * 100) : 0; }
 function _badge(val, good, warn) {
   if (val >= good) return { cls: 'good', text: 'Đạt' };
@@ -6784,11 +6792,11 @@ function _computeBUStats(data, uniqueBUs) {
     const rows = aliasedData.filter(r => r.bu === bu);
     const days = [...new Set(rows.map(r => r.date))].length || 1;
     const n1c = _sum(rows,'calls_n1'), n1tb = _sum(rows,'trial_book'), n1tm = _sum(rows,'trial_mkt');
-    const n1l = _sum(rows,'lead_mkt'), n1d = _sum(rows,'deal_n1'), n1r = _sum(rows,'revenue_n1');
+    const n1l = _sum(rows,'lead_mkt'), n1d = _sumDeal(rows,'deal_n1'), n1r = _sum(rows,'revenue_n1');
     const n2cskh = _sum(rows,'calls_cskh'), n2lr = _sum(rows,'lead_referral');
-    const n2dr = _sum(rows,'deal_reupsell'), n2dref = _sum(rows,'deal_referral'), n2r = _sum(rows,'revenue_n2');
+    const n2dr = _sumDeal(rows,'deal_reupsell'), n2dref = _sumDeal(rows,'deal_referral'), n2r = _sum(rows,'revenue_n2');
     const n3c = _sum(rows,'calls_n3'), n3dir = _sum(rows,'direct_sales'), n3tbn3 = _sum(rows,'trial_book_n3');
-    const n3l = _sum(rows,'lead_n3'), n3t = _sum(rows,'trial_n3'), n3d = _sum(rows,'deal_n3'), n3r = _sum(rows,'revenue_n3');
+    const n3l = _sum(rows,'lead_n3'), n3t = _sum(rows,'trial_n3'), n3d = _sumDeal(rows,'deal_n3'), n3r = _sum(rows,'revenue_n3');
     const totalDeals = n1d + n2dr + n2dref + n3d;
     const totalRev = n1r + n2r + n3r;
     // workScore: trung bình tất cả metrics trong WM_BENCH
@@ -6858,22 +6866,22 @@ function renderAnalytics() {
   const n1_leads = _sum(filtered, 'lead_mkt');
   const n1_calls = _sum(filtered, 'calls_n1');
   const n1_trial_mkt = _sum(filtered, 'trial_mkt');
-  const n1_deals = _sum(filtered, 'deal_n1');
+  const n1_deals = _sumDeal(filtered, 'deal_n1');
   const n1_rev = _sum(filtered, 'revenue_n1');
   const n1_calls_avg = buCount > 0 ? (n1_calls / buCount / avgDays) : 0;
   const n1_trial_mkt_avg = buCount > 0 ? (n1_trial_mkt / buCount / avgDays) : 0;
 
   const n2_calls_cskh = _sum(filtered, 'calls_cskh');
   const n2_lead_ref = _sum(filtered, 'lead_referral');
-  const n2_deal_re = _sum(filtered, 'deal_reupsell');
-  const n2_deal_ref = _sum(filtered, 'deal_referral');
+  const n2_deal_re = _sumDeal(filtered, 'deal_reupsell');
+  const n2_deal_ref = _sumDeal(filtered, 'deal_referral');
   const n2_rev = _sum(filtered, 'revenue_n2');
   const n2_cskh_avg = buCount > 0 ? (n2_calls_cskh / buCount / avgDays) : 0;
 
   const n3_leads = _sum(filtered, 'lead_n3');
   const n3_calls = _sum(filtered, 'calls_n3');
   const n3_trial = _sum(filtered, 'trial_n3');
-  const n3_deals = _sum(filtered, 'deal_n3');
+  const n3_deals = _sumDeal(filtered, 'deal_n3');
   const n3_rev = _sum(filtered, 'revenue_n3');
   const n3_calls_avg = buCount > 0 ? (n3_calls / buCount / avgDays) : 0;
 
