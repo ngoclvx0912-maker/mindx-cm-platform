@@ -1963,7 +1963,7 @@ async function runAnalysis() {
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg> Tải Daily...';
     try {
       const dailyResult = await apiFetch('getDailyAll', { month });
-      state.dashboard._dailyData = dailyResult.data || [];
+      state.dashboard._dailyData = applyFieldAliases(dailyResult.data || []);
     } catch(e) {
       console.warn('Could not load daily data:', e.message);
       state.dashboard._dailyData = [];
