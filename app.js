@@ -1248,13 +1248,22 @@ async function loadCMKpiProgress() {
 
   try {
     // --- 1. Fetch KPI targets ---
-    let targets = [];
+    // KPI_Targets sheet format: month, bu, kpi_n1, kpi_n2, kpi_n3, kpi_total, saved_at
+    const targetMap = { N1: 0, N2: 0, N3: 0 };
+    const labelMap  = { N1: 'N1 Optimize', N2: 'N2 Ops', N3: 'N3 Growth' };
     try {
       const kpiResult = await apiFetch('get_kpi_targets', { month });
-      if (kpiResult && kpiResult.success && Array.isArray(kpiResult.targets)) {
-        targets = kpiResult.targets.filter(t => t.bu === bu && t.kpi_name && t.target_value);
+      const allTargets = kpiResult && Array.isArray(kpiResult.targets) ? kpiResult.targets : [];
+      const buTarget = allTargets.find(t => t.bu === bu);
+      if (buTarget) {
+        targetMap.N1 = parseFloat(buTarget.kpi_n1) || 0;
+        targetMap.N2 = parseFloat(buTarget.kpi_n2) || 0;
+        targetMap.N3 = parseFloat(buTarget.kpi_n3) || 0;
       }
     } catch(e) { console.warn('loadCMKpiProgress: get_kpi_targets error', e.message); }
+
+    const totalTarget = targetMap.N1 + targetMap.N2 + targetMap.N3;
+    const hasTargets = totalTarget > 0;
 
     // --- 2. Fetch daily MTD actuals ---
     let actuals = { N1: 0, N2: 0, N3: 0 };
@@ -1271,26 +1280,6 @@ async function loadCMKpiProgress() {
     } catch(e) { console.warn('loadCMKpiProgress: getDailyMTD error', e.message); }
 
     const totalActual = actuals.N1 + actuals.N2 + actuals.N3;
-
-    // --- 3. Build target map per func group ---
-    // targets may have func = "N1"/"N2"/"N3" or we sum all revenue KPIs per func
-    const targetMap = { N1: 0, N2: 0, N3: 0 };
-    const labelMap  = { N1: 'N1 Optimize', N2: 'N2 Ops', N3: 'N3 Growth' };
-    targets.forEach(t => {
-      const grp = (t.func || '').toUpperCase();
-      if (grp === 'N1' || grp === 'N2' || grp === 'N3') {
-        targetMap[grp] += (parseFloat(t.target_value) || 0);
-      }
-    });
-
-    // Try to use kpi_name as label if there's exactly one per group
-    ['N1','N2','N3'].forEach(g => {
-      const gTargets = targets.filter(t => (t.func || '').toUpperCase() === g);
-      if (gTargets.length === 1 && gTargets[0].kpi_name) labelMap[g] = gTargets[0].kpi_name;
-    });
-
-    const totalTarget = targetMap.N1 + targetMap.N2 + targetMap.N3;
-    const hasTargets = totalTarget > 0;
 
     // --- 4. Pace indicator ---
     const pace = calcPacePct(month); // existing helper — returns 0-100
