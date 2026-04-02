@@ -309,9 +309,9 @@ function fmtMonth(year, month) {
 }
 
 /**
- * Tự động xác định chu kỳ AP dựa trên ngày hiện tại.
- * Giai đoạn = khoảng ngày kết thúc bằng Chủ nhật.
- * AP = giai đoạn TIẾP THEO (kế hoạch cho tuần sắp tới).
+ * Xác định chu kỳ AP = giai đoạn HIỆN TẠI.
+ * CM làm AP phục vụ cho giai đoạn đang diễn ra.
+ * Giai đoạn = khoảng ngày kết thúc bằng Chủ nhật (hoặc ngày cuối tháng).
  */
 function detectReportPeriod(now) {
   if (!now) now = new Date();
@@ -320,28 +320,13 @@ function detectReportPeriod(now) {
   const dayOfMonth = now.getDate();
   const dayOfWeek = now.getDay(); // 0=CN
 
-  const periods = getPeriodBoundaries(year, month);
   const curPeriod = getCurrentPeriod(year, month, dayOfMonth);
-  const curIdx = periods.findIndex(p => p.week === curPeriod.week);
 
-  // AP = giai đoạn TIẾP THEO
-  let apMonth, apWeek, apStartDay, apEndDay;
-  if (curIdx < periods.length - 1) {
-    // Còn giai đoạn tiếp trong tháng
-    const nextP = periods[curIdx + 1];
-    apMonth = fmtMonth(year, month);
-    apWeek = nextP.week;
-    apStartDay = nextP.startDay;
-    apEndDay = nextP.endDay;
-  } else {
-    // Giai đoạn cuối tháng → AP = giai đoạn 1 tháng sau
-    const next = getNextMonth(year, month);
-    apMonth = fmtMonth(next.year, next.month);
-    const nextPeriods = getPeriodBoundaries(next.year, next.month);
-    apWeek = 1;
-    apStartDay = nextPeriods[0].startDay;
-    apEndDay = nextPeriods[0].endDay;
-  }
+  // AP = giai đoạn HIỆN TẠI (không phải giai đoạn tiếp theo)
+  const apMonth = fmtMonth(year, month);
+  const apWeek = curPeriod.week;
+  const apStartDay = curPeriod.startDay;
+  const apEndDay = curPeriod.endDay;
 
   // Deadline: khóa T5 và T6. Mở lại từ T7.
   const isLocked = dayOfWeek === 4 || dayOfWeek === 5;
@@ -355,14 +340,12 @@ function detectReportPeriod(now) {
     lockMessage = `Đã khóa chỉnh sửa (hôm nay ${todayName}). Mở lại vào Thứ 7.`;
     deadlineLabel = 'Đã khóa';
   } else {
-    let daysUntilDeadline;
-    if (dayOfWeek === 6) daysUntilDeadline = 5;
-    else if (dayOfWeek === 0) daysUntilDeadline = 4;
-    else daysUntilDeadline = 3 - dayOfWeek + 1;
-    if (dayOfWeek === 3) {
-      deadlineLabel = 'Hạn cuối hôm nay (Thứ 4)';
+    // Số ngày còn lại trong giai đoạn
+    const daysLeft = apEndDay - dayOfMonth;
+    if (daysLeft <= 0) {
+      deadlineLabel = 'Ngày cuối giai đoạn';
     } else {
-      deadlineLabel = `Còn ${daysUntilDeadline} ngày (hạn Thứ 4)`;
+      deadlineLabel = `Còn ${daysLeft} ngày trong giai đoạn`;
     }
   }
 
@@ -371,8 +354,6 @@ function detectReportPeriod(now) {
     return `Tháng ${parseInt(mo)}/${y}`;
   }
 
-  // Label hiển thị: "Tháng 4/2026 — Ngày 6-12"
-  const [apY, apMo] = apMonth.split('-');
   const apLabel = `${monthLabel(apMonth)} — Ngày ${apStartDay}-${apEndDay}`;
 
   return {
@@ -388,7 +369,7 @@ function detectReportPeriod(now) {
       week: curPeriod.week,
       startDay: curPeriod.startDay,
       endDay: curPeriod.endDay,
-      label: `${monthLabel(fmtMonth(year, month))} — Ngày ${curPeriod.startDay}-${curPeriod.endDay}`
+      label: apLabel // current = AP (cùng giai đoạn)
     },
     isLocked,
     lockMessage,
