@@ -4940,8 +4940,10 @@ let _kpiPendingImport = null;
 /** Normalize BU name: remove extra spaces, standardize separators */
 function normalizeBU(name) {
   return String(name).trim()
-    .replace(/\s*-\s*/g, ' - ')  // normalize "HCM1-PVT" to "HCM1 - PVT"
-    .replace(/\s+/g, ' ');
+    .replace(/\s*-\s*/g, ' - ')
+    .replace(/\s+/g, ' ')
+    .replace(/3\/2/g, '3T2')    // "3/2" → "3T2"
+    .replace(/- 32\b/g, '- 3T2'); // "- 32" → "- 3T2" (Excel cắt "/")
 }
 
 /** Find best matching BU from system list */
