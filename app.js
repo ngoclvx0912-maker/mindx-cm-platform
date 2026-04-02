@@ -1030,7 +1030,9 @@ function updateDashPeriodDisplay() {
   if (!el) return;
   const { month, week } = state.dashboard;
   const [y, mo] = month.split('-');
-  el.textContent = `Tháng ${parseInt(mo)}/${y} — Tuần ${week}`;
+  const bounds = getPeriodBoundaries(parseInt(y), parseInt(mo));
+  const pInfo = bounds.find(p => p.week === week) || { startDay: '?', endDay: '?' };
+  el.textContent = `Tháng ${parseInt(mo)}/${y} — Ngày ${pInfo.startDay}-${pInfo.endDay}`;
 }
 
 function onDashPeriodChange() {
@@ -2167,7 +2169,11 @@ function openDetailPanel(bu) {
   const funcInfo = state.dashboard.funcFilter !== 'ALL'
     ? ` · Function: ${state.dashboard.funcFilter}`
     : '';
-  document.getElementById('detail-meta').textContent = `Vùng: ${s.region} · ${state.dashboard.month} · Tuần ${state.dashboard.week}${funcInfo}`;
+  // Hiển thị giai đoạn dạng ngày
+  const [_dY, _dMo] = state.dashboard.month.split('-');
+  const _dBounds = getPeriodBoundaries(parseInt(_dY), parseInt(_dMo));
+  const _dP = _dBounds.find(p => p.week === state.dashboard.week) || { startDay: '?', endDay: '?' };
+  document.getElementById('detail-meta').textContent = `Vùng: ${s.region} · Tháng ${parseInt(_dMo)}/${_dY} · Ngày ${_dP.startDay}-${_dP.endDay}${funcInfo}`;
 
   // Chi tiết Action Plan
   renderAPDetailInPanel(bu);
