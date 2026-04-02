@@ -249,11 +249,49 @@ const WEEK_PACE = { 1: 0.15, 2: 0.40, 3: 0.70, 4: 1.00 };
 // CM nộp báo cáo CN + T2. Khóa sau T4.
 // WR = tuần vừa qua, AP = tuần tới
 
-function getWeekOfMonth(dayOfMonth) {
-  if (dayOfMonth <= 7) return 1;
-  if (dayOfMonth <= 14) return 2;
-  if (dayOfMonth <= 21) return 3;
-  return 4;
+/**
+ * Xác định giai đoạn (period) trong tháng dựa trên ngày Chủ nhật.
+ * Mỗi giai đoạn kết thúc vào Chủ nhật, bắt đầu từ Thứ 2 (hoặc ngày 1).
+ * Trả về { week, startDay, endDay, label }
+ * week = 1,2,3,4,5 (giữ số để tương thích với database)
+ */
+function getPeriodBoundaries(year, month) {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const periods = [];
+  let startDay = 1;
+  let week = 1;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = new Date(year, month - 1, d).getDay(); // 0=CN
+    if (dow === 0 || d === daysInMonth) {
+      periods.push({ week, startDay, endDay: d });
+      startDay = d + 1;
+      week++;
+    }
+  }
+  return periods;
+}
+
+/**
+ * Xác định giai đoạn hiện tại của ngày trong tháng.
+ * Trả về { week, startDay, endDay }
+ */
+function getCurrentPeriod(year, month, dayOfMonth) {
+  const periods = getPeriodBoundaries(year, month);
+  for (const p of periods) {
+    if (dayOfMonth >= p.startDay && dayOfMonth <= p.endDay) return p;
+  }
+  return periods[periods.length - 1]; // fallback: giai đoạn cuối
+}
+
+/** Backward compat: trả về week number cho ngày bất kỳ */
+function getWeekOfMonth(dayOfMonth, year, month) {
+  if (!year || !month) {
+    const now = new Date();
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
+  }
+  return getCurrentPeriod(year, month, dayOfMonth).week;
 }
 
 function getPrevMonth(year, month) {
@@ -272,32 +310,40 @@ function fmtMonth(year, month) {
 
 /**
  * Tự động xác định chu kỳ AP dựa trên ngày hiện tại.
- * AP = tuần tiếp theo (kế hoạch cho tuần sắp tới).
- * CM ghi và FM đọc cùng dùng chung chu kỳ này.
- * @returns {{ ap: {month, week, label}, isLocked, lockMessage, deadlineLabel, todayName }}
+ * Giai đoạn = khoảng ngày kết thúc bằng Chủ nhật.
+ * AP = giai đoạn TIẾP THEO (kế hoạch cho tuần sắp tới).
  */
 function detectReportPeriod(now) {
   if (!now) now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 1-12
+  const month = now.getMonth() + 1;
   const dayOfMonth = now.getDate();
-  const dayOfWeek = now.getDay(); // 0=CN, 1=T2, ..., 6=T7
+  const dayOfWeek = now.getDay(); // 0=CN
 
-  const currentWeek = getWeekOfMonth(dayOfMonth);
+  const periods = getPeriodBoundaries(year, month);
+  const curPeriod = getCurrentPeriod(year, month, dayOfMonth);
+  const curIdx = periods.findIndex(p => p.week === curPeriod.week);
 
-  // AP = tuần TIẾP THEO (kế hoạch cho tuần sắp tới)
-  let apMonth, apWeek;
-  if (currentWeek < 4) {
+  // AP = giai đoạn TIẾP THEO
+  let apMonth, apWeek, apStartDay, apEndDay;
+  if (curIdx < periods.length - 1) {
+    // Còn giai đoạn tiếp trong tháng
+    const nextP = periods[curIdx + 1];
     apMonth = fmtMonth(year, month);
-    apWeek = currentWeek + 1;
+    apWeek = nextP.week;
+    apStartDay = nextP.startDay;
+    apEndDay = nextP.endDay;
   } else {
-    // W4 → W1 tháng sau
+    // Giai đoạn cuối tháng → AP = giai đoạn 1 tháng sau
     const next = getNextMonth(year, month);
     apMonth = fmtMonth(next.year, next.month);
+    const nextPeriods = getPeriodBoundaries(next.year, next.month);
     apWeek = 1;
+    apStartDay = nextPeriods[0].startDay;
+    apEndDay = nextPeriods[0].endDay;
   }
 
-  // Deadline: khóa chỉ T5 và T6. Mở lại từ T7.
+  // Deadline: khóa T5 và T6. Mở lại từ T7.
   const isLocked = dayOfWeek === 4 || dayOfWeek === 5;
 
   const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
@@ -318,7 +364,6 @@ function detectReportPeriod(now) {
     } else {
       deadlineLabel = `Còn ${daysUntilDeadline} ngày (hạn Thứ 4)`;
     }
-    lockMessage = '';
   }
 
   function monthLabel(m) {
@@ -326,11 +371,24 @@ function detectReportPeriod(now) {
     return `Tháng ${parseInt(mo)}/${y}`;
   }
 
+  // Label hiển thị: "Tháng 4/2026 — Ngày 6-12"
+  const [apY, apMo] = apMonth.split('-');
+  const apLabel = `${monthLabel(apMonth)} — Ngày ${apStartDay}-${apEndDay}`;
+
   return {
     ap: {
       month: apMonth,
       week: apWeek,
-      label: `${monthLabel(apMonth)} — Tuần ${apWeek}`
+      startDay: apStartDay,
+      endDay: apEndDay,
+      label: apLabel
+    },
+    current: {
+      month: fmtMonth(year, month),
+      week: curPeriod.week,
+      startDay: curPeriod.startDay,
+      endDay: curPeriod.endDay,
+      label: `${monthLabel(fmtMonth(year, month))} — Ngày ${curPeriod.startDay}-${curPeriod.endDay}`
     },
     isLocked,
     lockMessage,
@@ -884,28 +942,30 @@ function initRouting() {
  * CM và FM dùng chung chu kỳ này để ghi/đọc AP
  */
 function generatePeriodHistory(currentPeriod) {
-  const periods = [];
+  const result = [];
   // Bắt đầu từ chu kỳ AP hiện tại, lùi dần về trước
   let m = currentPeriod.ap.month;
   let w = currentPeriod.ap.week;
 
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 12; i++) {
     const [y, mo] = m.split('-');
-    const label = `Tháng ${parseInt(mo)}/${y} — Tuần ${w}`;
-    periods.push({ month: m, week: w, label, isCurrent: i === 0 });
+    const pBounds = getPeriodBoundaries(parseInt(y), parseInt(mo));
+    const pInfo = pBounds.find(p => p.week === w) || pBounds[pBounds.length - 1];
+    const label = `Tháng ${parseInt(mo)}/${y} — Ngày ${pInfo.startDay}-${pInfo.endDay}`;
+    result.push({ month: m, week: w, startDay: pInfo.startDay, endDay: pInfo.endDay, label, isCurrent: i === 0 });
 
-    // Lùi 1 tuần
+    // Lùi 1 giai đoạn
     if (w > 1) {
       w--;
     } else {
-      // W1 → W4 tháng trước
       const prev = getPrevMonth(parseInt(y), parseInt(mo));
       m = fmtMonth(prev.year, prev.month);
-      w = 4;
+      const prevBounds = getPeriodBoundaries(prev.year, prev.month);
+      w = prevBounds[prevBounds.length - 1].week;
     }
   }
 
-  return periods;
+  return result;
 }
 
 function populateSelects() {
