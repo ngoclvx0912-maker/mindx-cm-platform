@@ -1220,6 +1220,147 @@ async function loadCMData() {
 
   // Tải FM Note cho CM sau khi data đã sẵn sàng
   if (bu) await loadCMFMNote();
+
+  // Tải KPI Progress
+  loadCMKpiProgress();
+}
+
+// ===================== CM KPI PROGRESS =====================
+
+/**
+ * Load and render KPI Progress section for the CM Dashboard.
+ * Shows revenue KPI targets vs actual MTD for N1/N2/N3 and total.
+ */
+async function loadCMKpiProgress() {
+  const el = document.getElementById('cm-kpi-progress');
+  if (!el) return;
+
+  const bu = state.cm.bu;
+  const month = state.cm.apMonth;
+
+  if (!bu || !month) {
+    el.style.display = 'none';
+    return;
+  }
+
+  el.style.display = '';
+  el.innerHTML = '<div class="cm-kpi-no-target">Đang tải KPI...</div>';
+
+  try {
+    // --- 1. Fetch KPI targets ---
+    let targets = [];
+    try {
+      const kpiResult = await apiFetch('get_kpi_targets', { month });
+      if (kpiResult && kpiResult.success && Array.isArray(kpiResult.targets)) {
+        targets = kpiResult.targets.filter(t => t.bu === bu && t.kpi_name && t.target_value);
+      }
+    } catch(e) { console.warn('loadCMKpiProgress: get_kpi_targets error', e.message); }
+
+    // --- 2. Fetch daily MTD actuals ---
+    let actuals = { N1: 0, N2: 0, N3: 0 };
+    try {
+      const dailyResult = await apiFetch('getDailyMTD', { bu, month });
+      const rows = applyFieldAliases((dailyResult && dailyResult.data) ? dailyResult.data : []);
+      const fields = getDailyFields();
+      fields.filter(f => f.role === 'revenue').forEach(f => {
+        const grp = f.group || '';
+        if (grp === 'N1' || grp === 'N2' || grp === 'N3') {
+          rows.forEach(r => { actuals[grp] = (actuals[grp] || 0) + (parseInt(r[f.id]) || 0); });
+        }
+      });
+    } catch(e) { console.warn('loadCMKpiProgress: getDailyMTD error', e.message); }
+
+    const totalActual = actuals.N1 + actuals.N2 + actuals.N3;
+
+    // --- 3. Build target map per func group ---
+    // targets may have func = "N1"/"N2"/"N3" or we sum all revenue KPIs per func
+    const targetMap = { N1: 0, N2: 0, N3: 0 };
+    const labelMap  = { N1: 'N1 Optimize', N2: 'N2 Ops', N3: 'N3 Growth' };
+    targets.forEach(t => {
+      const grp = (t.func || '').toUpperCase();
+      if (grp === 'N1' || grp === 'N2' || grp === 'N3') {
+        targetMap[grp] += (parseFloat(t.target_value) || 0);
+      }
+    });
+
+    // Try to use kpi_name as label if there's exactly one per group
+    ['N1','N2','N3'].forEach(g => {
+      const gTargets = targets.filter(t => (t.func || '').toUpperCase() === g);
+      if (gTargets.length === 1 && gTargets[0].kpi_name) labelMap[g] = gTargets[0].kpi_name;
+    });
+
+    const totalTarget = targetMap.N1 + targetMap.N2 + targetMap.N3;
+    const hasTargets = totalTarget > 0;
+
+    // --- 4. Pace indicator ---
+    const pace = calcPacePct(month); // existing helper — returns 0-100
+
+    // --- 5. Render ---
+    const [yyyy, mm] = month.split('-').map(Number);
+    const monthDisplay = `Tháng ${mm}/${yyyy}`;
+
+    // Pace status for total actual
+    const totalPct = hasTargets && totalTarget > 0 ? (totalActual / totalTarget) * 100 : 0;
+    let paceBadge = '';
+    if (hasTargets) {
+      if (totalPct >= pace) {
+        paceBadge = `<span class="cm-kpi-pace-badge cm-kpi-pace-fast">▲ Nhanh hơn kỳ vọng</span>`;
+      } else if (totalPct >= pace * 0.8) {
+        paceBadge = `<span class="cm-kpi-pace-badge cm-kpi-pace-ok">→ Đúng tiến độ</span>`;
+      } else {
+        paceBadge = `<span class="cm-kpi-pace-badge cm-kpi-pace-slow">▼ Chậm tiến độ</span>`;
+      }
+    }
+
+    function pctClass(pct) {
+      if (pct >= 100) return 'pct-green';
+      if (pct < 50) return 'pct-warn';
+      return 'pct-normal';
+    }
+
+    function buildRow(label, actual, target, colorHex, extraClass) {
+      const pct = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+      const pctDisplay = target > 0 ? Math.round((actual / target) * 100) : (actual > 0 ? 100 : 0);
+      const fillStyle = `width:${pct.toFixed(1)}%;background:${colorHex}`;
+      const valText = target > 0
+        ? `${fmtRev(actual)} / ${fmtRev(target)}`
+        : `${fmtRev(actual)} / —`;
+      return `
+        <div class="cm-kpi-row${extraClass ? ' ' + extraClass : ''}">
+          <div class="cm-kpi-label" style="color:${colorHex}">${escHtml(label)}</div>
+          <div class="cm-kpi-track"><div class="cm-kpi-fill" style="${fillStyle}"></div></div>
+          <div class="cm-kpi-values">${valText}</div>
+          <div class="cm-kpi-pct ${pctClass(pctDisplay)}">${pctDisplay}%</div>
+        </div>`;
+    }
+
+    const N1_COLOR = '#cc0000';
+    const N2_COLOR = '#1a5276';
+    const N3_COLOR = '#1a7a3a';
+    const TOT_COLOR = '#444';
+
+    const noTargetMsg = !hasTargets
+      ? `<div class="cm-kpi-no-target">Chưa có KPI — Vui lòng import KPI tại tab Cấu hình</div>`
+      : '';
+
+    el.innerHTML = `
+      <div class="cm-kpi-header">
+        <span class="cm-kpi-title">📊 KPI ${monthDisplay} — ${escHtml(bu)}</span>
+        ${paceBadge}
+      </div>
+      <div class="cm-kpi-rows">
+        ${noTargetMsg}
+        ${buildRow(labelMap.N1, actuals.N1, targetMap.N1, N1_COLOR, '')}
+        ${buildRow(labelMap.N2, actuals.N2, targetMap.N2, N2_COLOR, '')}
+        ${buildRow(labelMap.N3, actuals.N3, targetMap.N3, N3_COLOR, '')}
+        ${buildRow('TỔNG', totalActual, totalTarget, TOT_COLOR, 'cm-kpi-total')}
+      </div>
+    `;
+
+  } catch(err) {
+    console.error('loadCMKpiProgress error:', err);
+    el.innerHTML = '<div class="cm-kpi-no-target">Không thể tải KPI Progress</div>';
+  }
 }
 
 function updateSavedIndicators() {
