@@ -1835,16 +1835,25 @@ function computeScores(allData) {
   const dailyRows = state.dashboard._dailyData || [];
 
   // Tính số ngày kỳ vọng (từ đầu tháng đến hôm qua, trừ CN)
-  const today = new Date();
+  const now = new Date();
+  // Tính theo giờ VN (UTC+7)
+  const vnNow = new Date(now.getTime() + 7 * 3600000);
   const [yyyy, mm] = month.split('-').map(Number);
   const monthStart = new Date(yyyy, mm - 1, 1);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  const monthEnd = new Date(yyyy, mm, 0); // ngày cuối của tháng
+  const vnYesterday = new Date(vnNow);
+  vnYesterday.setDate(vnYesterday.getDate() - 1);
+  // Upper bound: ngày hôm qua HOẶC ngày cuối tháng (nếu xem tháng cũ)
+  const upperDate = monthEnd < vnYesterday ? monthEnd : vnYesterday;
   const expectedDays = [];
-  for (let d = new Date(monthStart); d <= yesterday; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(monthStart); d <= upperDate; d.setDate(d.getDate() + 1)) {
     const dow = d.getDay(); // 0=Sun
     if (dow !== 0) { // Trừ Chủ nhật
-      expectedDays.push(d.toISOString().slice(0, 10));
+      // Chỉ lấy ngày TRONG tháng đang xem
+      const dateStr = d.toISOString().slice(0, 10);
+      if (dateStr.startsWith(month)) {
+        expectedDays.push(dateStr);
+      }
     }
   }
 
