@@ -5811,8 +5811,12 @@ function computeDopsums(rows, buFilter) {
 }
 
 function renderDailyOps() {
-  const data = state.dailyOps.rawData;
-  if (!data) return;
+  const rawData = state.dailyOps.rawData;
+  if (!rawData) return;
+
+  // Filter: chỉ giữ rows thuộc tháng đang xem
+  const dopsMonth = document.getElementById('dops-month')?.value || '';
+  const data = dopsMonth ? rawData.filter(r => (r.date || '').startsWith(dopsMonth)) : rawData;
 
   const sourceFilter = document.getElementById('dops-source')?.value || 'ALL';
   const buFilter = document.getElementById('dops-bu')?.value || 'ALL';
