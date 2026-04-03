@@ -5584,7 +5584,8 @@ state.dailyOps = {
   month: '',
   rawData: null,   // all daily rows for current month
   _prevData: null, // all daily rows for previous month (MoM)
-  sums: null       // computed aggregates
+  sums: null,      // computed aggregates
+  selectedBUs: null // multi-select BU filter (null = all)
 };
 
 function switchDashTab(tab) {
@@ -5617,17 +5618,8 @@ function initDailyOps() {
     monthSel.value = curMonth;
   }
 
-  // Populate BU dropdown
-  const buSel = document.getElementById('dops-bu');
-  if (buSel && buSel.options.length <= 1) {
-    buSel.innerHTML = '<option value="ALL">T\u1EA5t c\u1EA3 BU</option>';
-    BU_LIST.forEach(bu => {
-      const opt = document.createElement('option');
-      opt.value = bu;
-      opt.textContent = bu;
-      buSel.appendChild(opt);
-    });
-  }
+  // Init BU multi-select filter
+  initDopsBUFilter();
 
   // Auto-load if no data yet
   if (!state.dailyOps.rawData) {
@@ -5810,21 +5802,130 @@ function computeDopsums(rows, buFilter) {
   };
 }
 
+// ===================== DAILY OPS BU MULTI-SELECT FILTER =====================
+
+function initDopsBUFilter() {
+  const shortcutsEl = document.getElementById('dops-bu-shortcuts');
+  const listEl = document.getElementById('dops-bu-list');
+  if (!shortcutsEl || !listEl) return;
+
+  // Region shortcuts
+  let sh = '<button class="ana-multi-shortcut active" data-region="ALL" onclick="dopsRegionToggle(\'ALL\', this)">Tất cả</button>';
+  ANA_REGIONS.forEach(r => {
+    sh += `<button class="ana-multi-shortcut" data-region="${r.key}" onclick="dopsRegionToggle('${r.key}', this)">${r.label}</button>`;
+  });
+  shortcutsEl.innerHTML = sh;
+
+  // BU checkboxes
+  listEl.innerHTML = BU_LIST.map(bu =>
+    `<label class="ana-multi-item"><input type="checkbox" value="${bu}" checked onchange="updateDopsShortcutStates()">${bu}</label>`
+  ).join('');
+
+  state.dailyOps.selectedBUs = [...BU_LIST];
+  updateDopsBULabel();
+}
+
+function toggleDopsBUDropdown() {
+  const dd = document.getElementById('dops-bu-dropdown');
+  if (dd) dd.style.display = dd.style.display === 'none' ? 'flex' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('dops-bu-multi');
+  const dd = document.getElementById('dops-bu-dropdown');
+  if (wrap && dd && !wrap.contains(e.target)) dd.style.display = 'none';
+});
+
+function dopsRegionToggle(key) {
+  const listEl = document.getElementById('dops-bu-list');
+  if (!listEl) return;
+  const checks = listEl.querySelectorAll('input[type="checkbox"]');
+  if (key === 'ALL') {
+    const allChecked = Array.from(checks).every(c => c.checked);
+    checks.forEach(c => c.checked = !allChecked);
+  } else {
+    const regionBUs = getBUsForRegion(key);
+    const regionChecks = Array.from(checks).filter(c => regionBUs.includes(c.value));
+    const allChecked = regionChecks.every(c => c.checked);
+    regionChecks.forEach(c => c.checked = !allChecked);
+  }
+  updateDopsShortcutStates();
+}
+
+function updateDopsShortcutStates() {
+  const listEl = document.getElementById('dops-bu-list');
+  const shortcutsEl = document.getElementById('dops-bu-shortcuts');
+  if (!listEl || !shortcutsEl) return;
+  const checks = listEl.querySelectorAll('input[type="checkbox"]');
+  const checkedVals = new Set(Array.from(checks).filter(c => c.checked).map(c => c.value));
+  shortcutsEl.querySelectorAll('.ana-multi-shortcut').forEach(btn => {
+    const key = btn.dataset.region;
+    const regionBUs = getBUsForRegion(key);
+    btn.classList.toggle('active', regionBUs.every(bu => checkedVals.has(bu)));
+  });
+}
+
+function dopsBUSelectAll() {
+  const listEl = document.getElementById('dops-bu-list');
+  if (listEl) listEl.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = true);
+  updateDopsShortcutStates();
+}
+function dopsBUClearAll() {
+  const listEl = document.getElementById('dops-bu-list');
+  if (listEl) listEl.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false);
+  updateDopsShortcutStates();
+}
+
+function dopsBUApply() {
+  const listEl = document.getElementById('dops-bu-list');
+  if (!listEl) return;
+  const checks = listEl.querySelectorAll('input[type="checkbox"]');
+  const selected = Array.from(checks).filter(c => c.checked).map(c => c.value);
+  state.dailyOps.selectedBUs = selected.length > 0 ? selected : [...BU_LIST];
+  updateDopsBULabel();
+  document.getElementById('dops-bu-dropdown').style.display = 'none';
+  renderDailyOps();
+}
+
+function updateDopsBULabel() {
+  const el = document.getElementById('dops-bu-label');
+  if (!el) return;
+  const sel = state.dailyOps.selectedBUs || BU_LIST;
+  if (sel.length === BU_LIST.length) {
+    el.textContent = `Tất cả BU (${BU_LIST.length})`;
+  } else if (sel.length === 1) {
+    el.textContent = sel[0];
+  } else {
+    el.textContent = `${sel.length} BU`;
+  }
+}
+
 function renderDailyOps() {
   const rawData = state.dailyOps.rawData;
   if (!rawData) return;
 
   // Filter: chỉ giữ rows thuộc tháng đang xem
   const dopsMonth = document.getElementById('dops-month')?.value || '';
-  const data = dopsMonth ? rawData.filter(r => (r.date || '').startsWith(dopsMonth)) : rawData;
+  let data = dopsMonth ? rawData.filter(r => (r.date || '').startsWith(dopsMonth)) : rawData;
+
+  // Filter theo ngày (nếu chọn)
+  const dopsDate = document.getElementById('dops-date')?.value || '';
+  if (dopsDate) {
+    data = data.filter(r => r.date === dopsDate);
+  }
 
   const sourceFilter = document.getElementById('dops-source')?.value || 'ALL';
-  const buFilter = document.getElementById('dops-bu')?.value || 'ALL';
+
+  // BU filter: dùng multi-select
+  const selectedBUs = state.dailyOps.selectedBUs || BU_LIST;
+  const buFilter = selectedBUs.length === BU_LIST.length ? 'ALL' : '__MULTI__';
+  const filteredData = buFilter === 'ALL' ? data : data.filter(r => selectedBUs.includes(r.bu));
 
   // Compute current and previous month aggregates
-  const cur = computeDopsums(data, buFilter);
+  const cur = computeDopsums(filteredData, 'ALL'); // đã filter trước, pass ALL
   const prevRaw = state.dailyOps._prevData || [];
-  const prev = prevRaw.length > 0 ? computeDopsums(prevRaw, buFilter) : null;
+  const prevFiltered = buFilter === 'ALL' ? prevRaw : prevRaw.filter(r => selectedBUs.includes(r.bu));
+  const prev = prevFiltered.length > 0 ? computeDopsums(prevFiltered, 'ALL') : null;
 
   const s = cur.raw;
 

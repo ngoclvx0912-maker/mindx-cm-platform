@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css?v=kpi6">
+  <link rel="stylesheet" href="./style.css?v=kpi7">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -603,6 +603,11 @@
         </select>
       </div>
       <div class="dops-filter-group">
+        <span class="dops-filter-label">Ngày</span>
+        <input type="date" id="dops-date" class="topbar-select" onchange="renderDailyOps()" style="min-width:130px">
+        <button onclick="document.getElementById('dops-date').value=''; renderDailyOps()" class="btn-xs" title="Xem cả tháng" style="margin-left:2px;padding:3px 6px;font-size:10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;background:#f5f5f5">✕</button>
+      </div>
+      <div class="dops-filter-group">
         <span class="dops-filter-label">Nguồn</span>
         <select id="dops-source" class="topbar-select" onchange="renderDailyOps()">
           <option value="ALL">Tất cả nguồn</option>
@@ -611,11 +616,23 @@
           <option value="N3">N3 — Growth</option>
         </select>
       </div>
-      <div class="dops-filter-group">
+      <div class="dops-filter-group" style="position:relative">
         <span class="dops-filter-label">BU</span>
-        <select id="dops-bu" class="topbar-select" onchange="renderDailyOps()">
-          <option value="ALL">Tất cả BU</option>
-        </select>
+        <div id="dops-bu-multi" class="ana-multi-wrap">
+          <button class="ana-multi-btn" onclick="toggleDopsBUDropdown()">
+            <span id="dops-bu-label">Tất cả BU (46)</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div id="dops-bu-dropdown" class="ana-multi-dropdown" style="display:none">
+            <div id="dops-bu-shortcuts" class="ana-multi-shortcuts"></div>
+            <div id="dops-bu-list" class="ana-multi-list"></div>
+            <div class="ana-multi-actions">
+              <button onclick="dopsBUSelectAll()" class="ana-multi-action-btn">Chọn tất cả</button>
+              <button onclick="dopsBUClearAll()" class="ana-multi-action-btn">Bỏ chọn</button>
+              <button onclick="dopsBUApply()" class="btn btn-primary btn-sm">Áp dụng</button>
+            </div>
+          </div>
+        </div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="loadDailyOps()" style="margin-left:8px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
@@ -1346,6 +1363,6 @@
   </div>
 </div>
 
-<script src="./app.js?v=kpi6"></script>
+<script src="./app.js?v=kpi7"></script>
 </body>
 </html>
