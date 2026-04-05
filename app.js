@@ -320,13 +320,39 @@ function detectReportPeriod(now) {
   const dayOfMonth = now.getDate();
   const dayOfWeek = now.getDay(); // 0=CN
 
+  const periods = getPeriodBoundaries(year, month);
   const curPeriod = getCurrentPeriod(year, month, dayOfMonth);
+  const curIdx = periods.findIndex(p => p.week === curPeriod.week);
 
-  // AP = giai đoạn HIỆN TẠI (không phải giai đoạn tiếp theo)
-  const apMonth = fmtMonth(year, month);
-  const apWeek = curPeriod.week;
-  const apStartDay = curPeriod.startDay;
-  const apEndDay = curPeriod.endDay;
+  // AP logic:
+  // - Chủ nhật (ngày cuối giai đoạn) → AP = giai đoạn SAU (làm AP cho tuần tới)
+  // - Các ngày khác → AP = giai đoạn HIỆN TẠI
+  let apMonth, apWeek, apStartDay, apEndDay;
+
+  if (dayOfWeek === 0) {
+    // Chủ nhật → AP cho giai đoạn tiếp theo
+    if (curIdx < periods.length - 1) {
+      const nextP = periods[curIdx + 1];
+      apMonth = fmtMonth(year, month);
+      apWeek = nextP.week;
+      apStartDay = nextP.startDay;
+      apEndDay = nextP.endDay;
+    } else {
+      // Giai đoạn cuối tháng → AP = GĐ1 tháng sau
+      const next = getNextMonth(year, month);
+      apMonth = fmtMonth(next.year, next.month);
+      const nextPeriods = getPeriodBoundaries(next.year, next.month);
+      apWeek = 1;
+      apStartDay = nextPeriods[0].startDay;
+      apEndDay = nextPeriods[0].endDay;
+    }
+  } else {
+    // Các ngày khác → AP = giai đoạn hiện tại
+    apMonth = fmtMonth(year, month);
+    apWeek = curPeriod.week;
+    apStartDay = curPeriod.startDay;
+    apEndDay = curPeriod.endDay;
+  }
 
   // Deadline: khóa T5 và T6. Mở lại từ T7.
   const isLocked = dayOfWeek === 4 || dayOfWeek === 5;
@@ -339,8 +365,9 @@ function detectReportPeriod(now) {
   if (isLocked) {
     lockMessage = `Đã khóa chỉnh sửa (hôm nay ${todayName}). Mở lại vào Thứ 7.`;
     deadlineLabel = 'Đã khóa';
+  } else if (dayOfWeek === 0) {
+    deadlineLabel = 'Hôm nay làm AP cho giai đoạn tiếp theo';
   } else {
-    // Số ngày còn lại trong giai đoạn
     const daysLeft = apEndDay - dayOfMonth;
     if (daysLeft <= 0) {
       deadlineLabel = 'Ngày cuối giai đoạn';
