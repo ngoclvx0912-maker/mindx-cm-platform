@@ -5660,6 +5660,9 @@ async function loadDailyOps() {
 
   state.dailyOps.month = month;
 
+  // Load config cho tháng này (để getBenchmark đọc đúng)
+  await preloadConfigForMonth(month);
+
   const loading = document.getElementById('dops-loading');
   const empty = document.getElementById('dops-empty');
   const content = document.getElementById('dops-content');
@@ -7034,6 +7037,9 @@ async function loadAnalytics() {
   const month = document.getElementById('ana-month')?.value;
   if (!month) return;
   state.analytics.month = month;
+
+  // Load config cho tháng này (để getBenchmark/getCRBenchmark đọc đúng)
+  await preloadConfigForMonth(month);
 
   const loading = document.getElementById('ana-loading');
   const empty = document.getElementById('ana-empty');
