@@ -7782,7 +7782,7 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
 
   let activityRows = '';
   sourceFields.forEach(f => {
-    if (f.role === 'revenue') return; // handled separately
+    if (f.role === 'revenue' || f.role === 'trial' || f.role === 'deal') return; // skip lagging indicators
     const bench = getBenchmark(f.id);
     const total = data.reduce((s, r) => s + (parseInt(r[f.id]) || 0), 0);
     const perBUDay = total / safeCount / safeDays;
