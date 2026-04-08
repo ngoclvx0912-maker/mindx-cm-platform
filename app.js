@@ -7295,49 +7295,21 @@ function renderAnalytics() {
   if (wmEl) {
     wmEl.innerHTML = `<div class="ana-wm-grid">
       <div class="ana-wm-source">
-        <div class="ana-wm-source-title n1">N1 \u2014 Optimize (MKT)</div>
-        ${wmRow('S\u1ED1 call N1', n1_calls, n1_calls_avg, WM_BENCH.calls_n1, '')}
-        ${WM_BENCH.trial_book > 0 ? wmRow('S\u1ED1 Trial Book MKT', n1_trial_book, n1_trial_book_avg, WM_BENCH.trial_book, '') : ''}
-        <div class="ana-wm-row">
-          <span class="ana-wm-label">L4 Trial MKT</span>
-          <span class="ana-wm-value">${fmtN(n1_trial_mkt)}</span>
-          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${n1_trial_mkt_avg.toFixed(1)}/BU/ng\u00E0y</span>
-        </div>
-        <div class="ana-wm-row">
-          <span class="ana-wm-label">L1 Lead MKT</span>
-          <span class="ana-wm-value">${fmtN(n1_leads)}</span>
-          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n1_leads / Math.max(buCount,1) / avgDays).toFixed(1)}/BU/ng\u00E0y</span>
-        </div>
+        <div class="ana-wm-source-title n1">N1 — Optimize (MKT)</div>
+        ${wmRow('L1 Lead MKT', n1_leads, n1_leads / Math.max(buCount,1) / avgDays, WM_BENCH.lead_mkt || 0, '')}
+        ${wmRow('Số call N1', n1_calls, n1_calls_avg, WM_BENCH.calls_n1, '')}
+        ${WM_BENCH.trial_book > 0 ? wmRow('Số Trial Book MKT', n1_trial_book, n1_trial_book_avg, WM_BENCH.trial_book, '') : ''}
       </div>
       <div class="ana-wm-source">
-        <div class="ana-wm-source-title n2">N2 \u2014 Ops (Re/Upsell)</div>
-        ${wmRow('S\u1ED1 call CSKH', n2_calls_cskh, n2_cskh_avg, WM_BENCH.calls_cskh, '')}
-        <div class="ana-wm-row">
-          <span class="ana-wm-label">L2 Referral</span>
-          <span class="ana-wm-value">${fmtN(n2_lead_ref)}</span>
-          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_lead_ref / Math.max(buCount,1) / avgDays).toFixed(2)}/BU/ng\u00E0y</span>
-        </div>
-        <div class="ana-wm-row">
-          <span class="ana-wm-label">L6 Re/Upsell</span>
-          <span class="ana-wm-value">${fmtN(n2_deal_re)}</span>
-          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_deal_re / Math.max(buCount,1) / avgDays).toFixed(2)}/BU/ng\u00E0y</span>
-        </div>
-        <div class="ana-wm-row">
-          <span class="ana-wm-label">L6 Referral</span>
-          <span class="ana-wm-value">${fmtN(n2_deal_ref)}</span>
-          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n2_deal_ref / Math.max(buCount,1) / avgDays).toFixed(2)}/BU/ng\u00E0y</span>
-        </div>
+        <div class="ana-wm-source-title n2">N2 — Ops (Re/Upsell)</div>
+        ${wmRow('Số call CSKH', n2_calls_cskh, n2_cskh_avg, WM_BENCH.calls_cskh, '')}
       </div>
       <div class="ana-wm-source">
-        <div class="ana-wm-source-title n3">N3 \u2014 Growth (T\u1EF1 ki\u1EBFm)</div>
-        ${wmRow('S\u1ED1 call N3', n3_calls, n3_calls_avg, WM_BENCH.calls_n3, '')}
-        ${WM_BENCH.direct_sales > 0 ? wmRow('L\u01b0\u1ee3t \u0111i Direct', n3_direct, n3_direct_avg, WM_BENCH.direct_sales, '') : ''}
-        ${WM_BENCH.trial_book_n3 > 0 ? wmRow('S\u1ED1 Trial Book N3', n3_trial_book_n3, n3_trial_book_n3_avg, WM_BENCH.trial_book_n3, '') : ''}
-        <div class="ana-wm-row">
-          <span class="ana-wm-label">L1 Leads t\u1EF1 ki\u1EBFm</span>
-          <span class="ana-wm-value">${fmtN(n3_leads)}</span>
-          <span class="ana-wm-badge" style="background:var(--blue-bg);color:#1a5aa0">${(n3_leads / Math.max(buCount,1) / avgDays).toFixed(1)}/BU/ng\u00E0y</span>
-        </div>
+        <div class="ana-wm-source-title n3">N3 — Growth (Tự kiếm)</div>
+        ${wmRow('L1 Leads tự kiếm', n3_leads, n3_leads / Math.max(buCount,1) / avgDays, WM_BENCH.lead_n3 || 0, '')}
+        ${wmRow('Số call N3', n3_calls, n3_calls_avg, WM_BENCH.calls_n3, '')}
+        ${WM_BENCH.direct_sales > 0 ? wmRow('Lượt đi Direct', n3_direct, n3_direct_avg, WM_BENCH.direct_sales, '') : ''}
+        ${WM_BENCH.trial_book_n3 > 0 ? wmRow('Số Trial Book N3', n3_trial_book_n3, n3_trial_book_n3_avg, WM_BENCH.trial_book_n3, '') : ''}
       </div>
     </div>`;
   }
@@ -7352,41 +7324,75 @@ function renderAnalytics() {
     if (multiMode) {
       wmCmpEl.style.display = '';
       const sorted = [...buStats].sort((a,b) => b.calls - a.calls);
-      // Bench cho các cột so sánh — dùng WM_BENCH động, fallback về default
-      const bmCallsN1  = WM_BENCH.calls_n1  || 15;
-      const bmTrialMkt = getBenchmark('trial_book') > 0 ? getBenchmark('trial_book') : (getBenchmark('trial_mkt') || 3);
+      // Bench — chỉ số chăm chỉ: Lead, Call, Trial Book, Direct
+      const bmLeadN1   = getBenchmark('lead_mkt') || 0;
+      const bmCallsN1  = WM_BENCH.calls_n1 || 15;
+      const bmTrialBk  = getBenchmark('trial_book') || 0;
       const bmCskh     = WM_BENCH.calls_cskh || 10;
-      const bmCallsN3  = WM_BENCH.calls_n3  || 5;
-      // Find max values for bar scaling
+      const bmLeadN3   = getBenchmark('lead_n3') || 0;
+      const bmCallsN3  = WM_BENCH.calls_n3 || 5;
+      const bmDirect   = WM_BENCH.direct_sales || 0;
+      const bmTrialBkN3= getBenchmark('trial_book_n3') || 0;
+
+      // Tính per-BU lead/call/trialBook/direct
+      const enriched = sorted.map(s => {
+        const rows = data.filter(r => r.bu === s.bu);
+        const days = s.days || 1;
+        return {
+          ...s,
+          leadN1: _sum(rows, 'lead_mkt') / days,
+          callsN1: s.calls,
+          trialBookN1: s.trial_book || 0,
+          cskhD: s.cskh,
+          leadN3: _sum(rows, 'lead_n3') / days,
+          callsN3: s.calls_n3,
+          directD: s.direct || 0,
+          trialBookN3: s.trial_book_n3 || 0,
+        };
+      });
+
       const wmMax = {
-        calls:     Math.max(...sorted.map(s=>s.calls),     bmCallsN1)  * 1.1,
-        trial_mkt: Math.max(...sorted.map(s=>s.trial_mkt), bmTrialMkt) * 1.1,
-        cskh:      Math.max(...sorted.map(s=>s.cskh),      bmCskh)     * 1.1,
-        calls_n3:  Math.max(...sorted.map(s=>s.calls_n3),  bmCallsN3)  * 1.1
+        leadN1:   Math.max(...enriched.map(s=>s.leadN1),   bmLeadN1 || 1) * 1.1,
+        callsN1:  Math.max(...enriched.map(s=>s.callsN1),  bmCallsN1) * 1.1,
+        trialBk:  Math.max(...enriched.map(s=>s.trialBookN1), bmTrialBk || 1) * 1.1,
+        cskh:     Math.max(...enriched.map(s=>s.cskhD),    bmCskh) * 1.1,
+        leadN3:   Math.max(...enriched.map(s=>s.leadN3),   bmLeadN3 || 1) * 1.1,
+        callsN3:  Math.max(...enriched.map(s=>s.callsN3),  bmCallsN3) * 1.1,
+        direct:   Math.max(...enriched.map(s=>s.directD),  bmDirect || 1) * 1.1,
       };
-      let rows = sorted.map(s => {
+
+      let rows2 = enriched.map(s => {
         return `<tr>
           <td>${s.bu}</td>
-          <td class="${_cmpCls(s.calls, bmCallsN1, bmCallsN1*0.6)}">${s.calls.toFixed(1)} ${_cmpBar(s.calls, wmMax.calls, bmCallsN1)}</td>
-          <td class="${_cmpCls(s.trial_mkt, bmTrialMkt, bmTrialMkt*0.6)}">${s.trial_mkt.toFixed(1)} ${_cmpBar(s.trial_mkt, wmMax.trial_mkt, bmTrialMkt)}</td>
-          <td class="${_cmpCls(s.cskh, bmCskh, bmCskh*0.6)}">${s.cskh.toFixed(1)} ${_cmpBar(s.cskh, wmMax.cskh, bmCskh)}</td>
-          <td class="${_cmpCls(s.calls_n3, bmCallsN3, bmCallsN3*0.6)}">${s.calls_n3.toFixed(1)} ${_cmpBar(s.calls_n3, wmMax.calls_n3, bmCallsN3)}</td>
+          <td class="${bmLeadN1 > 0 ? _cmpCls(s.leadN1, bmLeadN1, bmLeadN1*0.6) : ''}">${s.leadN1.toFixed(1)} ${bmLeadN1 > 0 ? _cmpBar(s.leadN1, wmMax.leadN1, bmLeadN1) : _cmpBar(s.leadN1, wmMax.leadN1, 0)}</td>
+          <td class="${_cmpCls(s.callsN1, bmCallsN1, bmCallsN1*0.6)}">${s.callsN1.toFixed(1)} ${_cmpBar(s.callsN1, wmMax.callsN1, bmCallsN1)}</td>
+          <td class="${bmTrialBk > 0 ? _cmpCls(s.trialBookN1, bmTrialBk, bmTrialBk*0.6) : ''}">${s.trialBookN1.toFixed(1)} ${_cmpBar(s.trialBookN1, wmMax.trialBk, bmTrialBk)}</td>
+          <td class="${_cmpCls(s.cskhD, bmCskh, bmCskh*0.6)}">${s.cskhD.toFixed(1)} ${_cmpBar(s.cskhD, wmMax.cskh, bmCskh)}</td>
+          <td class="${bmLeadN3 > 0 ? _cmpCls(s.leadN3, bmLeadN3, bmLeadN3*0.6) : ''}">${s.leadN3.toFixed(1)} ${_cmpBar(s.leadN3, wmMax.leadN3, bmLeadN3)}</td>
+          <td class="${_cmpCls(s.callsN3, bmCallsN3, bmCallsN3*0.6)}">${s.callsN3.toFixed(1)} ${_cmpBar(s.callsN3, wmMax.callsN3, bmCallsN3)}</td>
+          <td class="${bmDirect > 0 ? _cmpCls(s.directD, bmDirect, bmDirect*0.6) : ''}">${s.directD.toFixed(1)} ${_cmpBar(s.directD, wmMax.direct, bmDirect)}</td>
         </tr>`;
       }).join('');
-      rows += `<tr class="ana-cmp-summary-row">
+
+      const tbAvg = (arr, key) => (arr.reduce((s,x) => s + x[key], 0) / arr.length).toFixed(1);
+      rows2 += `<tr class="ana-cmp-summary-row">
         <td>TB (${buCount} BU)</td>
-        <td>${n1_calls_avg.toFixed(1)}</td>
-        <td>${n1_trial_mkt_avg.toFixed(1)}</td>
-        <td>${n2_cskh_avg.toFixed(1)}</td>
-        <td>${n3_calls_avg.toFixed(1)}</td>
+        <td>${tbAvg(enriched,'leadN1')}</td>
+        <td>${tbAvg(enriched,'callsN1')}</td>
+        <td>${tbAvg(enriched,'trialBookN1')}</td>
+        <td>${tbAvg(enriched,'cskhD')}</td>
+        <td>${tbAvg(enriched,'leadN3')}</td>
+        <td>${tbAvg(enriched,'callsN3')}</td>
+        <td>${tbAvg(enriched,'directD')}</td>
       </tr>`;
+
       wmCmpBody.innerHTML = `<table class="ana-cmp-table">
         <thead><tr>
-          <th>BU</th><th>Calls N1/d</th><th>Trial MKT/d</th><th>CSKH/d</th><th>Calls N3/d</th>
+          <th>BU</th><th>Lead N1/d</th><th>Call N1/d</th><th>TBook N1/d</th><th>CSKH/d</th><th>Lead N3/d</th><th>Call N3/d</th><th>Direct/d</th>
         </tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows2}</tbody>
       </table>
-      <div style="font-size:10px;color:var(--gray-400);margin-top:6px">\u0110\u01B0\u1EDDng d\u1ECDc: Benchmark | Calls N1 ${bmCallsN1} | Trial MKT ${bmTrialMkt} | CSKH ${bmCskh} | Calls N3 ${bmCallsN3}</div>`;
+      <div style="font-size:10px;color:var(--gray-400);margin-top:6px">Đường dọc: Benchmark | Lead N1 ${bmLeadN1} | Call N1 ${bmCallsN1} | TBook ${bmTrialBk} | CSKH ${bmCskh} | Lead N3 ${bmLeadN3} | Call N3 ${bmCallsN3} | Direct ${bmDirect}</div>`;
     } else {
       wmCmpEl.style.display = 'none';
     }
