@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Exo:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./style.css?v=kpi8">
+  <link rel="stylesheet" href="./style.css?v=filter1">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -603,9 +603,13 @@
         </select>
       </div>
       <div class="dops-filter-group">
-        <span class="dops-filter-label">Ngày</span>
-        <input type="date" id="dops-date" class="topbar-select" onchange="renderDailyOps()" style="min-width:130px">
-        <button onclick="document.getElementById('dops-date').value=''; renderDailyOps()" class="btn-xs" title="Xem cả tháng" style="margin-left:2px;padding:3px 6px;font-size:10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;background:#f5f5f5">✕</button>
+        <span class="dops-filter-label">Từ</span>
+        <input type="date" id="dops-date-from" class="topbar-select" onchange="renderDailyOps()" style="min-width:120px">
+      </div>
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">Đến</span>
+        <input type="date" id="dops-date-to" class="topbar-select" onchange="renderDailyOps()" style="min-width:120px">
+        <button onclick="clearDopsDateRange()" class="btn-xs" title="Xem cả tháng" style="margin-left:2px;padding:3px 6px;font-size:10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;background:#f5f5f5">✕</button>
       </div>
       <div class="dops-filter-group">
         <span class="dops-filter-label">Nguồn</span>
@@ -760,6 +764,24 @@
         <select id="ana-month" class="topbar-select" onchange="loadAnalytics()"></select>
       </div>
       <div class="dops-filter-group">
+        <span class="dops-filter-label">Từ</span>
+        <input type="date" id="ana-date-from" class="topbar-select" onchange="renderAnalytics()" style="min-width:120px">
+      </div>
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">Đến</span>
+        <input type="date" id="ana-date-to" class="topbar-select" onchange="renderAnalytics()" style="min-width:120px">
+        <button onclick="clearAnaDateRange()" class="btn-xs" title="Xem cả tháng" style="margin-left:2px;padding:3px 6px;font-size:10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;background:#f5f5f5">✕</button>
+      </div>
+      <div class="dops-filter-group">
+        <span class="dops-filter-label">Nguồn</span>
+        <select id="ana-source" class="topbar-select" onchange="renderAnalytics()">
+          <option value="ALL">Tất cả nguồn</option>
+          <option value="N1">N1 — Optimize</option>
+          <option value="N2">N2 — Ops</option>
+          <option value="N3">N3 — Growth</option>
+        </select>
+      </div>
+      <div class="dops-filter-group">
         <span class="dops-filter-label">BU</span>
         <div id="ana-bu-multi" class="ana-multi-select">
           <button type="button" class="ana-multi-btn" onclick="toggleAnaBUDropdown()">
@@ -797,6 +819,12 @@
 
     <!-- Analytics content -->
     <div id="ana-content" style="display:none">
+
+      <!-- SOURCE DETAIL VIEW (shown when specific source selected) -->
+      <div id="ana-source-detail" style="display:none"></div>
+
+      <!-- OVERVIEW WRAPPER (shown when All sources selected) -->
+      <div id="ana-overview">
 
       <!-- SECTION 1: WORK METRICS SCORECARD -->
       <div class="ana-panel">
@@ -888,6 +916,8 @@
           <div id="ana-mimi-response" style="display:none"></div>
         </div>
       </div>
+
+      </div><!-- /ana-overview -->
 
     </div><!-- /ana-content -->
 
@@ -1363,6 +1393,6 @@
   </div>
 </div>
 
-<script src="./app.js?v=kpi8"></script>
+<script src="./app.js?v=filter1"></script>
 </body>
 </html>

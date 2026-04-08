@@ -5927,6 +5927,22 @@ function updateDopsBULabel() {
   }
 }
 
+function clearDopsDateRange() {
+  const f = document.getElementById('dops-date-from');
+  const t = document.getElementById('dops-date-to');
+  if (f) f.value = '';
+  if (t) t.value = '';
+  renderDailyOps();
+}
+
+function clearAnaDateRange() {
+  const f = document.getElementById('ana-date-from');
+  const t = document.getElementById('ana-date-to');
+  if (f) f.value = '';
+  if (t) t.value = '';
+  renderAnalytics();
+}
+
 function renderDailyOps() {
   const rawData = state.dailyOps.rawData;
   if (!rawData) return;
@@ -5935,11 +5951,11 @@ function renderDailyOps() {
   const dopsMonth = document.getElementById('dops-month')?.value || '';
   let data = dopsMonth ? rawData.filter(r => (r.date || '').startsWith(dopsMonth)) : rawData;
 
-  // Filter theo ngày (nếu chọn)
-  const dopsDate = document.getElementById('dops-date')?.value || '';
-  if (dopsDate) {
-    data = data.filter(r => r.date === dopsDate);
-  }
+  // Filter theo khoảng ngày (nếu chọn)
+  const dateFrom = document.getElementById('dops-date-from')?.value || '';
+  const dateTo = document.getElementById('dops-date-to')?.value || '';
+  if (dateFrom) data = data.filter(r => r.date >= dateFrom);
+  if (dateTo) data = data.filter(r => r.date <= dateTo);
 
   const sourceFilter = document.getElementById('dops-source')?.value || 'ALL';
 
@@ -7163,22 +7179,47 @@ function renderAnalytics() {
   const selectedBUs = state.analytics.selectedBUs;
   const isAllBU = selectedBUs.length === BU_LIST.length;
   const selectedSet = new Set(selectedBUs);
-  const filtered = data.filter(r => selectedSet.has(r.bu));
+  let filtered = data.filter(r => selectedSet.has(r.bu));
   const month = state.analytics.month;
+
+  // Date range filter
+  const anaDateFrom = document.getElementById('ana-date-from')?.value || '';
+  const anaDateTo = document.getElementById('ana-date-to')?.value || '';
+  if (anaDateFrom) filtered = filtered.filter(r => r.date >= anaDateFrom);
+  if (anaDateTo) filtered = filtered.filter(r => r.date <= anaDateTo);
+
+  // Source filter
+  const anaSource = document.getElementById('ana-source')?.value || 'ALL';
+
   const uniqueBUs = [...new Set(filtered.map(r => r.bu))];
   const multiMode = uniqueBUs.length > 1;
 
   const metaEl = document.getElementById('ana-meta');
-  if (metaEl) metaEl.textContent = `${isAllBU ? uniqueBUs.length + ' BU' : uniqueBUs.length + ' BU \u0111\u00E3 ch\u1ECDn'} \u2014 Th\u00E1ng ${month}`;
+  const dateRangeLabel = (anaDateFrom || anaDateTo) ? ` | ${anaDateFrom || '?'} → ${anaDateTo || '?'}` : '';
+  if (metaEl) metaEl.textContent = `${isAllBU ? uniqueBUs.length + ' BU' : uniqueBUs.length + ' BU đã chọn'} — Tháng ${month}${dateRangeLabel}`;
 
   // Load benchmarks from config
   const bm = state.config.data?.benchmarks || CONFIG_DEFAULTS.benchmarks;
   const daysInMonth = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate();
   const sortedDays = [...new Set(filtered.map(r => r.date))].sort();
+  const daysInRange = sortedDays.length > 0 ? sortedDays.length : 1;
   const daysPassed = sortedDays.length > 0 ? Math.max(...sortedDays.map(d => parseInt(d.split('-')[2]))) : 0;
   const daysRemaining = daysInMonth - daysPassed;
   const buCount = uniqueBUs.length;
-  const avgDays = daysPassed > 0 ? daysPassed : 1;
+  const avgDays = daysInRange > 0 ? daysInRange : 1;
+
+  // Route to source detail view if specific source selected
+  const overviewEl = document.getElementById('ana-overview');
+  const detailEl = document.getElementById('ana-source-detail');
+  if (anaSource !== 'ALL') {
+    if (overviewEl) overviewEl.style.display = 'none';
+    if (detailEl) detailEl.style.display = '';
+    renderAnalyticsSourceDetail(filtered, anaSource, uniqueBUs, month, daysInMonth, daysInRange, buCount);
+    return;
+  }
+  // Show overview, hide detail
+  if (overviewEl) overviewEl.style.display = '';
+  if (detailEl) detailEl.style.display = 'none';
 
   // ============================
   // SECTION 1: WORK METRICS SCORECARD (Summary)
@@ -7682,6 +7723,306 @@ function renderAnalytics() {
       diagnostic: { star: buDiag.star.length, smart: buDiag.smart.length, effort: buDiag.effort.length }
     });
   }
+}
+
+// ============================================================
+// TASK 3 + 4: Detailed Source View
+// ============================================================
+function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth, daysInRange, buCount) {
+  const detailEl = document.getElementById('ana-source-detail');
+  if (!detailEl) return;
+
+  const safeCount = Math.max(buCount, 1);
+  const safeDays = Math.max(daysInRange, 1);
+
+  // Source metadata
+  const sourceMeta = {
+    N1: { label: 'N1 — Optimize (MKT)', color: 'var(--red)', colorName: 'red' },
+    N2: { label: 'N2 — Ops (Re/Upsell)', color: 'var(--blue)', colorName: 'blue' },
+    N3: { label: 'N3 — Growth (Tự kiếm)', color: 'var(--green)', colorName: 'green' }
+  };
+  const meta = sourceMeta[source] || { label: source, color: 'var(--red)', colorName: 'red' };
+
+  // --- SECTION 1: Activity Metrics Table ---
+  const sourceFields = getDailyFields().filter(f => f.group === source);
+
+  function pctColor(pct) {
+    if (pct >= 100) return 'var(--green)';
+    if (pct >= 80) return 'var(--orange)';
+    return 'var(--red)';
+  }
+  function pctIcon(pct) {
+    if (pct >= 100) return '✅';
+    if (pct >= 80) return '⚠️';
+    return '🔴';
+  }
+  function progressBar(pct, color) {
+    const w = Math.min(pct, 100).toFixed(1);
+    return `<div style="width:100%;background:#f0f0f0;border-radius:3px;height:8px;overflow:hidden">
+      <div style="width:${w}%;background:${color};height:8px;border-radius:3px;transition:width .3s"></div>
+    </div>`;
+  }
+
+  let activityRows = '';
+  sourceFields.forEach(f => {
+    if (f.role === 'revenue') return; // handled separately
+    const bench = getBenchmark(f.id);
+    const total = data.reduce((s, r) => s + (parseInt(r[f.id]) || 0), 0);
+    const perBUDay = total / safeCount / safeDays;
+    const pct = bench > 0 ? (perBUDay / bench * 100) : null;
+    const color = pct !== null ? pctColor(pct) : 'var(--gray-400)';
+    const icon = pct !== null ? pctIcon(pct) : '';
+    const pctStr = pct !== null ? `${pct.toFixed(1)}%` : '—';
+    const benchStr = bench > 0 ? `(B: ${bench})` : '';
+    activityRows += `<tr>
+      <td style="padding:6px 10px;font-size:12px;color:var(--gray-700)">${f.label}</td>
+      <td style="padding:6px 10px;font-size:12px;font-weight:600;text-align:right">${f.type === 'revenue' ? fmtRev(total) : fmtN(total)}</td>
+      <td style="padding:6px 10px;font-size:11px;color:var(--gray-500);text-align:right">${perBUDay.toFixed(2)}/BU/ngày</td>
+      <td style="padding:6px 10px;font-size:11px;color:var(--gray-500);text-align:center">${benchStr}</td>
+      <td style="padding:6px 12px;min-width:120px">${progressBar(pct || 0, color)}</td>
+      <td style="padding:6px 8px;font-size:11px;font-weight:700;color:${color};text-align:right;white-space:nowrap">${pctStr} ${icon}</td>
+    </tr>`;
+  });
+
+  // --- SECTION 2: Conversion Funnel ---
+  function fsStep(num, label) {
+    return `<div style="display:flex;flex-direction:column;align-items:center;padding:6px 0">
+      <span style="font-size:18px;font-weight:700;color:var(--gray-800)">${fmtN(num)}</span>
+      <span style="font-size:10px;color:var(--gray-500);margin-top:2px">${label}</span>
+    </div>`;
+  }
+  function fsArrow(from, to, label, benchCR) {
+    const cr = from > 0 ? (to / from * 100) : 0;
+    const color = benchCR > 0 ? (cr >= benchCR ? 'var(--green)' : cr >= benchCR * 0.7 ? 'var(--orange)' : 'var(--red)') : 'var(--gray-400)';
+    const benchLabel = benchCR > 0 ? ` (B: ${benchCR}%)` : '';
+    return `<div style="display:flex;flex-direction:column;align-items:center;padding:2px 0">
+      <span style="font-size:16px;color:var(--gray-400)">↓</span>
+      <span style="font-size:10px;font-weight:600;color:${color}">${label}: ${cr.toFixed(1)}%${benchLabel}</span>
+    </div>`;
+  }
+
+  let funnelHTML = '';
+  if (source === 'N1') {
+    const l1 = data.reduce((s,r)=>s+(parseInt(r.lead_mkt)||0),0);
+    const tb = data.reduce((s,r)=>s+(parseInt(r.trial_book)||0),0);
+    const tm = data.reduce((s,r)=>s+(parseInt(r.trial_mkt)||0),0);
+    const d = data.reduce((s,r)=>{ const v=parseInt(r.deal_n1)||0; return s+(v>1000?0:v); },0);
+    const rev = data.reduce((s,r)=>s+(parseInt(r.revenue_n1)||0),0);
+    const bmCR16 = getCRBenchmark('N1','cr16') || 15;
+    const bmCR46 = getCRBenchmark('N1','cr46') || 50;
+    funnelHTML = `<div style="display:flex;flex-direction:column;max-width:260px">
+      ${fsStep(l1, 'L1 Lead MKT')}
+      ${fsArrow(l1, tm, 'CR1→6', bmCR16)}
+      ${fsStep(tm, 'L4 Trial MKT')}
+      ${fsArrow(tm, d, 'CR4→6', bmCR46)}
+      ${fsStep(d, 'L6 Deal MKT')}
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-200);text-align:center">
+        <span style="font-size:16px;font-weight:700;color:var(--red)">${fmtRev(rev)}</span>
+        <div style="font-size:10px;color:var(--gray-500)">Doanh số N1</div>
+      </div>
+    </div>`;
+  } else if (source === 'N2') {
+    const cskh = data.reduce((s,r)=>s+(parseInt(r.calls_cskh)||0),0);
+    const reup = data.reduce((s,r)=>{ const v=parseInt(r.deal_reupsell)||0; return s+(v>1000?0:v); },0);
+    const ref = data.reduce((s,r)=>s+(parseInt(r.lead_referral)||0),0);
+    const dref = data.reduce((s,r)=>{ const v=parseInt(r.deal_referral)||0; return s+(v>1000?0:v); },0);
+    const rev = data.reduce((s,r)=>s+(parseInt(r.revenue_n2)||0),0);
+    const bmCRre = getCRBenchmark('N2','cr_reupsell') || 15;
+    const bmCRref = getCRBenchmark('N2','cr_referral') || 5;
+    funnelHTML = `<div style="display:flex;flex-direction:column;max-width:260px">
+      ${fsStep(cskh, 'CSKH (calls)')}
+      ${fsArrow(cskh, reup, 'CR Re/Upsell', bmCRre)}
+      ${fsStep(reup, 'Deal Re/Upsell')}
+      <div style="height:8px"></div>
+      ${fsStep(ref, 'L2 Referral')}
+      ${fsArrow(ref, dref, 'CR Referral', bmCRref)}
+      ${fsStep(dref, 'Deal Referral')}
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-200);text-align:center">
+        <span style="font-size:16px;font-weight:700;color:var(--blue)">${fmtRev(rev)}</span>
+        <div style="font-size:10px;color:var(--gray-500)">Doanh số N2</div>
+      </div>
+    </div>`;
+  } else if (source === 'N3') {
+    const l1 = data.reduce((s,r)=>s+(parseInt(r.lead_n3)||0),0);
+    const dir = data.reduce((s,r)=>s+(parseInt(r.direct_sales)||0),0);
+    const tbn3 = data.reduce((s,r)=>s+(parseInt(r.trial_book_n3)||0),0);
+    const tn3 = data.reduce((s,r)=>s+(parseInt(r.trial_n3)||0),0);
+    const d = data.reduce((s,r)=>{ const v=parseInt(r.deal_n3)||0; return s+(v>1000?0:v); },0);
+    const rev = data.reduce((s,r)=>s+(parseInt(r.revenue_n3)||0),0);
+    const bmCR16 = getCRBenchmark('N3','cr16') || 10;
+    const bmCR46 = getCRBenchmark('N3','cr46') || 40;
+    funnelHTML = `<div style="display:flex;flex-direction:column;max-width:260px">
+      ${fsStep(l1, 'Lead N3')}
+      ${fsStep(dir, 'Direct Sales')}
+      ${fsStep(tbn3, 'Trial Book N3')}
+      ${fsArrow(l1, tn3, 'CR1→4', bmCR16)}
+      ${fsStep(tn3, 'Trial N3')}
+      ${fsArrow(tn3, d, 'CR4→6', bmCR46)}
+      ${fsStep(d, 'Deal N3')}
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-200);text-align:center">
+        <span style="font-size:16px;font-weight:700;color:var(--green)">${fmtRev(rev)}</span>
+        <div style="font-size:10px;color:var(--gray-500)">Doanh số N3</div>
+      </div>
+    </div>`;
+  }
+
+  // --- SECTION 3: Revenue vs KPI ---
+  const revField = source === 'N1' ? 'revenue_n1' : source === 'N2' ? 'revenue_n2' : 'revenue_n3';
+  const kpiField = source === 'N1' ? 'kpi_n1' : source === 'N2' ? 'kpi_n2' : 'kpi_n3';
+  const totalRev = data.reduce((s,r)=>s+(parseInt(r[revField])||0),0);
+
+  // Try to get KPI from loaded targets
+  let kpiTotal = 0;
+  const kpiTargets = state.dashboard._kpiTargets && state.dashboard._kpiTargets[month];
+  if (kpiTargets && kpiTargets.length > 0) {
+    // Sum KPI for selected BUs
+    const buSet = new Set(uniqueBUs);
+    kpiTargets.forEach(t => {
+      if (buSet.has(t.bu)) kpiTotal += (parseFloat(t[kpiField]) || 0);
+    });
+  }
+  const proratedKPI = kpiTotal > 0 ? Math.round(kpiTotal * daysInRange / daysInMonth) : 0;
+  const revAchPct = proratedKPI > 0 ? (totalRev / proratedKPI * 100) : (kpiTotal > 0 ? 0 : null);
+  const revColor = revAchPct !== null ? pctColor(revAchPct) : 'var(--gray-400)';
+  const revIcon = revAchPct !== null ? pctIcon(revAchPct) : '';
+
+  let revKpiHTML = '';
+  if (kpiTotal > 0) {
+    revKpiHTML = `
+      <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-top:8px">
+        <div><div style="font-size:11px;color:var(--gray-500)">Doanh số thực tế</div><div style="font-size:22px;font-weight:700;color:${meta.color}">${fmtRev(totalRev)}</div></div>
+        <div><div style="font-size:11px;color:var(--gray-500)">KPI cả tháng</div><div style="font-size:18px;font-weight:600;color:var(--gray-600)">${fmtRev(kpiTotal)}</div></div>
+        <div><div style="font-size:11px;color:var(--gray-500)">KPI prorate (${daysInRange}/${daysInMonth} ngày)</div><div style="font-size:18px;font-weight:600;color:var(--gray-600)">${fmtRev(proratedKPI)}</div></div>
+        <div style="flex:1;min-width:180px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:11px;color:var(--gray-500)">% Đạt KPI (prorate)</span>
+            <span style="font-size:13px;font-weight:700;color:${revColor}">${revAchPct !== null ? revAchPct.toFixed(1)+'%' : '—'} ${revIcon}</span>
+          </div>
+          ${progressBar(revAchPct || 0, revColor)}
+        </div>
+      </div>`;
+  } else {
+    revKpiHTML = `<div style="padding:12px;color:var(--gray-400);font-size:12px;font-style:italic">Chưa có dữ liệu KPI cho tháng này. Nhập KPI trong tab cấu hình để xem so sánh.</div>`;
+  }
+
+  // --- SECTION 4: BU Comparison Table ---
+  let buRows = '';
+  const revField2 = revField;
+  const dealField = source === 'N1' ? 'deal_n1' : source === 'N2' ? ['deal_reupsell','deal_referral'] : 'deal_n3';
+
+  const buData = uniqueBUs.map(bu => {
+    const rows = data.filter(r => r.bu === bu);
+    const days = [...new Set(rows.map(r => r.date))].length || 1;
+    const buFields = {};
+    sourceFields.forEach(f => {
+      buFields[f.id] = rows.reduce((s,r) => {
+        const v = parseInt(r[f.id]) || 0;
+        return s + (f.role === 'deal' && v > 1000 ? 0 : v);
+      }, 0);
+    });
+    const rev = rows.reduce((s,r) => s+(parseInt(r[revField2])||0), 0);
+    let deals = 0;
+    if (Array.isArray(dealField)) {
+      deals = dealField.reduce((s,df) => s + rows.reduce((ss,r)=>{ const v=parseInt(r[df])||0; return ss+(v>1000?0:v); },0), 0);
+    } else {
+      deals = rows.reduce((s,r)=>{ const v=parseInt(r[dealField])||0; return s+(v>1000?0:v); },0);
+    }
+    // Determine lead for CR
+    let leadTotal = 0;
+    if (source === 'N1') leadTotal = rows.reduce((s,r)=>s+(parseInt(r.lead_mkt)||0),0);
+    else if (source === 'N2') leadTotal = rows.reduce((s,r)=>s+(parseInt(r.lead_referral)||0),0);
+    else if (source === 'N3') leadTotal = rows.reduce((s,r)=>s+(parseInt(r.lead_n3)||0),0);
+    const cr = leadTotal > 0 ? (deals / leadTotal * 100) : 0;
+    return { bu, days, ...buFields, rev, deals, cr };
+  }).sort((a,b) => b.rev - a.rev);
+
+  const maxRev = Math.max(...buData.map(b=>b.rev), 1);
+  buRows = buData.map(b => {
+    // Activity cols: first 3 sourceFields that are call/trial_book/activity
+    const actCols = sourceFields.filter(f => ['call','trial_book','activity'].includes(f.role)).slice(0, 3);
+    const actCells = actCols.map(f => {
+      const bench = getBenchmark(f.id);
+      const dayVal = (b[f.id] || 0) / b.days;
+      const pct = bench > 0 ? (dayVal / bench * 100) : null;
+      const color = pct !== null ? pctColor(pct) : 'inherit';
+      return `<td style="padding:5px 8px;font-size:11px;color:${color};text-align:right">${dayVal.toFixed(1)}</td>`;
+    }).join('');
+    const revW = maxRev > 0 ? Math.min(b.rev / maxRev * 100, 100) : 0;
+    const buKpi = (() => {
+      if (!kpiTargets) return 0;
+      const t = kpiTargets.find(t => t.bu === b.bu);
+      return t ? (parseFloat(t[kpiField]) || 0) : 0;
+    })();
+    const buKpiPro = buKpi > 0 ? buKpi * daysInRange / daysInMonth : 0;
+    const buRevPct = buKpiPro > 0 ? (b.rev / buKpiPro * 100) : null;
+    const buRevColor = buRevPct !== null ? pctColor(buRevPct) : 'inherit';
+    return `<tr>
+      <td style="padding:5px 10px;font-size:12px;font-weight:500">${b.bu}</td>
+      ${actCells}
+      <td style="padding:5px 8px;font-size:11px;text-align:right">${b.deals}</td>
+      <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);text-align:right">${b.cr.toFixed(1)}%</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:600;color:${meta.color};text-align:right">${fmtRev(b.rev)}<div style="margin-top:2px;width:100%;background:#f0f0f0;border-radius:2px;height:4px"><div style="width:${revW.toFixed(1)}%;background:${meta.color};height:4px;border-radius:2px"></div></div></td>
+      <td style="padding:5px 8px;font-size:11px;font-weight:700;color:${buRevColor};text-align:right">${buRevPct !== null ? buRevPct.toFixed(0)+'%' : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  const actColHeaders = sourceFields.filter(f=>['call','trial_book','activity'].includes(f.role)).slice(0,3)
+    .map(f => `<th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">${f.label}/d</th>`).join('');
+
+  // Build final HTML
+  detailEl.innerHTML = `
+    <div class="ana-panel" style="border-top:3px solid ${meta.color}">
+      <div class="ana-panel-header" style="color:${meta.color}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        ${meta.label} — Phân tích chi tiết
+      </div>
+      <div class="ana-section-desc">Khoảng xem: ${daysInRange} ngày | ${safeCount} BU đã chọn</div>
+
+      <!-- ACTIVITY METRICS -->
+      <div style="margin:12px 0 8px;font-size:12px;font-weight:600;color:var(--gray-700);border-bottom:1px solid var(--gray-200);padding-bottom:4px">Chỉ số hoạt động</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="background:var(--gray-50)">
+            <th style="padding:6px 10px;font-size:10px;font-weight:600;text-align:left;color:var(--gray-500)">Chỉ số</th>
+            <th style="padding:6px 10px;font-size:10px;font-weight:600;text-align:right;color:var(--gray-500)">Tổng</th>
+            <th style="padding:6px 10px;font-size:10px;font-weight:600;text-align:right;color:var(--gray-500)">TB/BU/ngày</th>
+            <th style="padding:6px 10px;font-size:10px;font-weight:600;text-align:center;color:var(--gray-500)">Benchmark</th>
+            <th style="padding:6px 12px;font-size:10px;font-weight:600;color:var(--gray-500)">Tiến độ</th>
+            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right;color:var(--gray-500)">% Đạt</th>
+          </tr></thead>
+          <tbody>${activityRows || '<tr><td colspan="6" style="padding:12px;color:var(--gray-400);text-align:center">Không có dữ liệu</td></tr>'}</tbody>
+        </table>
+      </div>
+
+      <!-- FUNNEL + REVENUE KPI side by side -->
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:16px">
+        <div style="flex:0 0 auto">
+          <div style="font-size:12px;font-weight:600;color:var(--gray-700);margin-bottom:8px;border-bottom:1px solid var(--gray-200);padding-bottom:4px">Conversion Funnel</div>
+          ${funnelHTML}
+        </div>
+        <div style="flex:1;min-width:240px">
+          <div style="font-size:12px;font-weight:600;color:var(--gray-700);margin-bottom:8px;border-bottom:1px solid var(--gray-200);padding-bottom:4px">Doanh số vs KPI</div>
+          ${revKpiHTML}
+        </div>
+      </div>
+
+      <!-- BU COMPARISON TABLE -->
+      <div style="margin-top:16px;font-size:12px;font-weight:600;color:var(--gray-700);border-bottom:1px solid var(--gray-200);padding-bottom:4px">So sánh BU (sắp xếp theo Doanh số)</div>
+      <div style="overflow-x:auto;margin-top:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--gray-50)">
+            <th style="padding:6px 10px;font-size:10px;font-weight:600;text-align:left">BU</th>
+            ${actColHeaders}
+            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">Deals</th>
+            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">CR%</th>
+            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">Doanh số</th>
+            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">% KPI</th>
+          </tr></thead>
+          <tbody>${buRows || '<tr><td colspan="8" style="padding:12px;color:var(--gray-400);text-align:center">Không có dữ liệu</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="font-size:10px;color:var(--gray-400);margin-top:6px">Giá trị hoạt động tnh theo trung bình ngày/BU. Màu xanh ≥ 100%, cam ≥ 80%, đỏ < 80% benchmark.</div>
+    </div>`;
 }
 
 // MiMi AI deep analysis from FM Analytics tab
