@@ -7992,11 +7992,19 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
   if (!window[_srcDetailSortId]) window[_srcDetailSortId] = { col: 'rev', dir: 'desc' };
   const sortSt = window[_srcDetailSortId];
 
+  const actColIds = new Set(actCols.map(f => f.id));
   function sortBUData(arr, col, dir) {
     return [...arr].sort((a,b) => {
-      let va = a[col], vb = b[col];
-      if (col === 'bu') { va = va || ''; vb = vb || ''; return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va); }
-      va = typeof va === 'number' ? va : 0; vb = typeof vb === 'number' ? vb : 0;
+      let va, vb;
+      if (col === 'bu') { va = a.bu || ''; vb = b.bu || ''; return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va); }
+      // Activity columns: sort by per-day value
+      if (actColIds.has(col)) {
+        va = (a[col] || 0) / (a.days || 1);
+        vb = (b[col] || 0) / (b.days || 1);
+      } else {
+        va = typeof a[col] === 'number' ? a[col] : (a[col] === null ? -1 : 0);
+        vb = typeof b[col] === 'number' ? b[col] : (b[col] === null ? -1 : 0);
+      }
       return dir === 'asc' ? va - vb : vb - va;
     });
   }
@@ -8011,7 +8019,8 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
         const dayVal = (b[f.id] || 0) / b.days;
         const pct = bench > 0 ? (dayVal / bench * 100) : null;
         const color = pct !== null ? pctColor(pct) : 'inherit';
-        return `<td style="padding:5px 8px;font-size:11px;color:${color};text-align:right">${dayVal.toFixed(1)}</td>`;
+        const pctLabel = pct !== null ? `<div style="font-size:9px;font-weight:600;color:${color};margin-top:1px">${pct.toFixed(0)}%</div>` : '';
+        return `<td style="padding:5px 8px;text-align:right"><div style="font-size:11px;color:${color}">${dayVal.toFixed(1)}</div>${pctLabel}</td>`;
       }).join('');
       const revW = maxRev > 0 ? Math.min(b.rev / maxRev * 100, 100) : 0;
       const buRevColor = b.buKpiPct !== null ? pctColor(b.buKpiPct) : 'inherit';
@@ -8024,7 +8033,6 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
           ${fmtRev(b.rev)}
           <div style="margin-top:2px;width:100%;background:#f0f0f0;border-radius:2px;height:4px"><div style="width:${revW.toFixed(1)}%;background:${meta.color};height:4px;border-radius:2px"></div></div>
         </td>
-        <td style="padding:5px 8px;font-size:11px;text-align:right">${b.buKpiRaw > 0 ? fmtRev(b.buKpiRaw) : '—'}</td>
         <td style="padding:5px 8px;font-size:11px;font-weight:700;color:${buRevColor};text-align:right">${b.buKpiPct !== null ? b.buKpiPct.toFixed(0)+'%' : '—'}</td>
       </tr>`;
     }).join('');
@@ -8038,7 +8046,13 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
     const active = sortSt.col === colKey ? 'font-weight:700;color:var(--gray-800);' : '';
     return `<th data-sort-col="${colKey}" style="padding:6px 8px;font-size:10px;font-weight:600;text-align:${align};cursor:pointer;user-select:none;${active}white-space:nowrap">${label}${arrow}</th>`;
   }
-  const actColHeaders = actCols.map(f => srtHdr(f.label+'/d', f.id, 'right')).join('');
+  const actColHeaders = actCols.map(f => {
+    const bench = getBenchmark(f.id);
+    const benchHint = bench > 0 ? `<div style="font-size:8px;font-weight:400;color:var(--gray-400)">B:${bench}/d</div>` : '';
+    const arrow = sortSt.col === f.id ? (sortSt.dir === 'asc' ? ' ↑' : ' ↓') : '';
+    const active = sortSt.col === f.id ? 'font-weight:700;color:var(--gray-800);' : '';
+    return `<th data-sort-col="${f.id}" style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right;cursor:pointer;user-select:none;${active}white-space:nowrap">${f.label}/d${arrow}${benchHint}</th>`;
+  }).join('');
 
   // Build final HTML
   detailEl.innerHTML = `
@@ -8087,7 +8101,6 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
             ${srtHdr('Deals', 'deals', 'right')}
             ${srtHdr('CR%', 'cr', 'right')}
             ${srtHdr('Doanh số', 'rev', 'right')}
-            ${srtHdr('KPI', 'buKpiRaw', 'right')}
             ${srtHdr('% KPI', 'buKpiPct', 'right')}
           </tr></thead>
           <tbody>${buRows || '<tr><td colspan="10" style="padding:12px;color:var(--gray-400);text-align:center">Không có dữ liệu</td></tr>'}</tbody>
