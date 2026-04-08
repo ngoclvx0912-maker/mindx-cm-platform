@@ -7801,20 +7801,28 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
     </tr>`;
   });
 
-  // --- SECTION 2: Conversion Funnel ---
-  function fsStep(num, label) {
-    return `<div style="display:flex;flex-direction:column;align-items:center;padding:6px 0">
-      <span style="font-size:18px;font-weight:700;color:var(--gray-800)">${fmtN(num)}</span>
-      <span style="font-size:10px;color:var(--gray-500);margin-top:2px">${label}</span>
+  // --- SECTION 2: Conversion Funnel (horizontal card design) ---
+  function funnelCard(num, label, color) {
+    return `<div style="text-align:center;min-width:80px;padding:10px 8px;background:var(--gray-50);border-radius:8px;border:1px solid var(--gray-200)">
+      <div style="font-size:20px;font-weight:700;color:${color || 'var(--gray-800)'}">${fmtN(num)}</div>
+      <div style="font-size:10px;color:var(--gray-500);margin-top:2px;white-space:nowrap">${label}</div>
     </div>`;
   }
-  function fsArrow(from, to, label, benchCR) {
+  function funnelArrow(from, to, label, benchCR) {
     const cr = from > 0 ? (to / from * 100) : 0;
     const color = benchCR > 0 ? (cr >= benchCR ? 'var(--green)' : cr >= benchCR * 0.7 ? 'var(--orange)' : 'var(--red)') : 'var(--gray-400)';
-    const benchLabel = benchCR > 0 ? ` (B: ${benchCR}%)` : '';
-    return `<div style="display:flex;flex-direction:column;align-items:center;padding:2px 0">
-      <span style="font-size:16px;color:var(--gray-400)">↓</span>
-      <span style="font-size:10px;font-weight:600;color:${color}">${label}: ${cr.toFixed(1)}%${benchLabel}</span>
+    const benchLabel = benchCR > 0 ? ` (B:${benchCR}%)` : '';
+    return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 2px;min-width:60px">
+      <span style="font-size:16px;color:var(--gray-300)">→</span>
+      <span style="font-size:10px;font-weight:700;color:${color};white-space:nowrap">${label}</span>
+      <span style="font-size:11px;font-weight:700;color:${color}">${cr.toFixed(1)}%</span>
+      <span style="font-size:9px;color:var(--gray-400)">${benchLabel}</span>
+    </div>`;
+  }
+  function funnelRevCard(rev, label, color) {
+    return `<div style="text-align:center;min-width:90px;padding:10px 12px;background:var(--gray-50);border-radius:8px;border:2px solid ${color}">
+      <div style="font-size:20px;font-weight:800;color:${color}">${fmtRev(rev)}</div>
+      <div style="font-size:10px;color:var(--gray-500);margin-top:2px">${label}</div>
     </div>`;
   }
 
@@ -7827,16 +7835,21 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
     const rev = data.reduce((s,r)=>s+(parseInt(r.revenue_n1)||0),0);
     const bmCR16 = getCRBenchmark('N1','cr16') || 15;
     const bmCR46 = getCRBenchmark('N1','cr46') || 50;
-    funnelHTML = `<div style="display:flex;flex-direction:column;max-width:260px">
-      ${fsStep(l1, 'L1 Lead MKT')}
-      ${fsArrow(l1, tm, 'CR1→6', bmCR16)}
-      ${fsStep(tm, 'L4 Trial MKT')}
-      ${fsArrow(tm, d, 'CR4→6', bmCR46)}
-      ${fsStep(d, 'L6 Deal MKT')}
-      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-200);text-align:center">
-        <span style="font-size:16px;font-weight:700;color:var(--red)">${fmtRev(rev)}</span>
-        <div style="font-size:10px;color:var(--gray-500)">Doanh số N1</div>
-      </div>
+    const aov = d > 0 ? rev / d : 0;
+    const bmAOV = getCRBenchmark('N1','aov') || 18;
+    const aovColor = bmAOV > 0 ? (aov >= bmAOV ? 'var(--green)' : aov >= bmAOV*0.7 ? 'var(--orange)' : 'var(--red)') : 'var(--gray-500)';
+    funnelHTML = `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:8px 0">
+      ${funnelCard(l1, 'L1 Lead MKT', 'var(--gray-800)')}
+      ${funnelArrow(l1, tm, 'CR1→4', bmCR16)}
+      ${funnelCard(tm, 'L4 Trial', meta.color)}
+      ${funnelArrow(tm, d, 'CR4→6', bmCR46)}
+      ${funnelCard(d, 'L6 Deal', meta.color)}
+      <div style="padding:0 4px;font-size:16px;color:var(--gray-300)">→</div>
+      ${funnelRevCard(rev, 'Doanh số N1', meta.color)}
+    </div>
+    <div style="display:flex;gap:16px;margin-top:8px;font-size:11px">
+      <span style="color:var(--gray-500)">Trial Book: <b>${fmtN(tb)}</b></span>
+      <span style="color:${aovColor}">AOV: <b>${fmtRev(aov)}/deal</b> (B:${bmAOV}M)</span>
     </div>`;
   } else if (source === 'N2') {
     const cskh = data.reduce((s,r)=>s+(parseInt(r.calls_cskh)||0),0);
@@ -7844,21 +7857,31 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
     const ref = data.reduce((s,r)=>s+(parseInt(r.lead_referral)||0),0);
     const dref = data.reduce((s,r)=>{ const v=parseInt(r.deal_referral)||0; return s+(v>1000?0:v); },0);
     const rev = data.reduce((s,r)=>s+(parseInt(r.revenue_n2)||0),0);
+    const totalDeals = reup + dref;
     const bmCRre = getCRBenchmark('N2','cr_reupsell') || 15;
     const bmCRref = getCRBenchmark('N2','cr_referral') || 5;
-    funnelHTML = `<div style="display:flex;flex-direction:column;max-width:260px">
-      ${fsStep(cskh, 'CSKH (calls)')}
-      ${fsArrow(cskh, reup, 'CR Re/Upsell', bmCRre)}
-      ${fsStep(reup, 'Deal Re/Upsell')}
-      <div style="height:8px"></div>
-      ${fsStep(ref, 'L2 Referral')}
-      ${fsArrow(ref, dref, 'CR Referral', bmCRref)}
-      ${fsStep(dref, 'Deal Referral')}
-      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-200);text-align:center">
-        <span style="font-size:16px;font-weight:700;color:var(--blue)">${fmtRev(rev)}</span>
-        <div style="font-size:10px;color:var(--gray-500)">Doanh số N2</div>
-      </div>
-    </div>`;
+    const aov = totalDeals > 0 ? rev / totalDeals : 0;
+    const bmAOV = getCRBenchmark('N2','aov') || 15;
+    const aovColor = bmAOV > 0 ? (aov >= bmAOV ? 'var(--green)' : aov >= bmAOV*0.7 ? 'var(--orange)' : 'var(--red)') : 'var(--gray-500)';
+    funnelHTML = `
+    <div style="margin-bottom:6px;font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px">Re/Upsell</div>
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:4px 0">
+      ${funnelCard(cskh, 'Calls CSKH', 'var(--gray-800)')}
+      ${funnelArrow(cskh, reup, 'CR Re/Upsell', bmCRre)}
+      ${funnelCard(reup, 'Deal Re/Upsell', meta.color)}
+    </div>
+    <div style="margin:10px 0 6px;font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px">Referral</div>
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:4px 0">
+      ${funnelCard(ref, 'L2 Referral', 'var(--gray-800)')}
+      ${funnelArrow(ref, dref, 'CR Referral', bmCRref)}
+      ${funnelCard(dref, 'Deal Referral', meta.color)}
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-200)">
+      <div style="font-size:11px;color:var(--gray-500)">Tổng Deal: <b style="color:${meta.color}">${fmtN(totalDeals)}</b></div>
+      <div style="padding:0 6px;color:var(--gray-300)">→</div>
+      ${funnelRevCard(rev, 'Doanh số N2', meta.color)}
+    </div>
+    <div style="margin-top:8px;font-size:11px"><span style="color:${aovColor}">AOV: <b>${fmtRev(aov)}/deal</b> (B:${bmAOV}M)</span></div>`;
   } else if (source === 'N3') {
     const l1 = data.reduce((s,r)=>s+(parseInt(r.lead_n3)||0),0);
     const dir = data.reduce((s,r)=>s+(parseInt(r.direct_sales)||0),0);
@@ -7868,18 +7891,22 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
     const rev = data.reduce((s,r)=>s+(parseInt(r.revenue_n3)||0),0);
     const bmCR16 = getCRBenchmark('N3','cr16') || 10;
     const bmCR46 = getCRBenchmark('N3','cr46') || 40;
-    funnelHTML = `<div style="display:flex;flex-direction:column;max-width:260px">
-      ${fsStep(l1, 'Lead N3')}
-      ${fsStep(dir, 'Direct Sales')}
-      ${fsStep(tbn3, 'Trial Book N3')}
-      ${fsArrow(l1, tn3, 'CR1→4', bmCR16)}
-      ${fsStep(tn3, 'Trial N3')}
-      ${fsArrow(tn3, d, 'CR4→6', bmCR46)}
-      ${fsStep(d, 'Deal N3')}
-      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--gray-200);text-align:center">
-        <span style="font-size:16px;font-weight:700;color:var(--green)">${fmtRev(rev)}</span>
-        <div style="font-size:10px;color:var(--gray-500)">Doanh số N3</div>
-      </div>
+    const aov = d > 0 ? rev / d : 0;
+    const bmAOV = getCRBenchmark('N3','aov') || 16;
+    const aovColor = bmAOV > 0 ? (aov >= bmAOV ? 'var(--green)' : aov >= bmAOV*0.7 ? 'var(--orange)' : 'var(--red)') : 'var(--gray-500)';
+    funnelHTML = `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:8px 0">
+      ${funnelCard(l1, 'L1 Lead N3', 'var(--gray-800)')}
+      ${funnelArrow(l1, tn3, 'CR1→4', bmCR16)}
+      ${funnelCard(tn3, 'L4 Trial', meta.color)}
+      ${funnelArrow(tn3, d, 'CR4→6', bmCR46)}
+      ${funnelCard(d, 'L6 Deal', meta.color)}
+      <div style="padding:0 4px;font-size:16px;color:var(--gray-300)">→</div>
+      ${funnelRevCard(rev, 'Doanh số N3', meta.color)}
+    </div>
+    <div style="display:flex;gap:16px;margin-top:8px;font-size:11px">
+      <span style="color:var(--gray-500)">Direct Sales: <b>${fmtN(dir)}</b></span>
+      <span style="color:var(--gray-500)">Trial Book: <b>${fmtN(tbn3)}</b></span>
+      <span style="color:${aovColor}">AOV: <b>${fmtRev(aov)}/deal</b> (B:${bmAOV}M)</span>
     </div>`;
   }
 
@@ -7922,10 +7949,10 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
     revKpiHTML = `<div style="padding:12px;color:var(--gray-400);font-size:12px;font-style:italic">Chưa có dữ liệu KPI cho tháng này. Nhập KPI trong tab cấu hình để xem so sánh.</div>`;
   }
 
-  // --- SECTION 4: BU Comparison Table ---
-  let buRows = '';
+  // --- SECTION 4: BU Comparison Table (sortable) ---
   const revField2 = revField;
   const dealField = source === 'N1' ? 'deal_n1' : source === 'N2' ? ['deal_reupsell','deal_referral'] : 'deal_n3';
+  const actCols = sourceFields.filter(f => ['call','trial_book','activity','lead','referral_lead'].includes(f.role));
 
   const buData = uniqueBUs.map(bu => {
     const rows = data.filter(r => r.bu === bu);
@@ -7944,47 +7971,74 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
     } else {
       deals = rows.reduce((s,r)=>{ const v=parseInt(r[dealField])||0; return s+(v>1000?0:v); },0);
     }
-    // Determine lead for CR
     let leadTotal = 0;
     if (source === 'N1') leadTotal = rows.reduce((s,r)=>s+(parseInt(r.lead_mkt)||0),0);
     else if (source === 'N2') leadTotal = rows.reduce((s,r)=>s+(parseInt(r.lead_referral)||0),0);
     else if (source === 'N3') leadTotal = rows.reduce((s,r)=>s+(parseInt(r.lead_n3)||0),0);
     const cr = leadTotal > 0 ? (deals / leadTotal * 100) : 0;
-    return { bu, days, ...buFields, rev, deals, cr };
-  }).sort((a,b) => b.rev - a.rev);
-
-  const maxRev = Math.max(...buData.map(b=>b.rev), 1);
-  buRows = buData.map(b => {
-    // Activity cols: first 3 sourceFields that are call/trial_book/activity
-    const actCols = sourceFields.filter(f => ['call','trial_book','activity'].includes(f.role)).slice(0, 3);
-    const actCells = actCols.map(f => {
-      const bench = getBenchmark(f.id);
-      const dayVal = (b[f.id] || 0) / b.days;
-      const pct = bench > 0 ? (dayVal / bench * 100) : null;
-      const color = pct !== null ? pctColor(pct) : 'inherit';
-      return `<td style="padding:5px 8px;font-size:11px;color:${color};text-align:right">${dayVal.toFixed(1)}</td>`;
-    }).join('');
-    const revW = maxRev > 0 ? Math.min(b.rev / maxRev * 100, 100) : 0;
-    const buKpi = (() => {
+    // KPI per BU
+    const buKpiRaw = (() => {
       if (!kpiTargets) return 0;
-      const t = kpiTargets.find(t => t.bu === b.bu);
+      const t = kpiTargets.find(t => t.bu === bu);
       return t ? (parseFloat(t[kpiField]) || 0) : 0;
     })();
-    const buKpiPro = buKpi > 0 ? buKpi * daysInRange / daysInMonth : 0;
-    const buRevPct = buKpiPro > 0 ? (b.rev / buKpiPro * 100) : null;
-    const buRevColor = buRevPct !== null ? pctColor(buRevPct) : 'inherit';
-    return `<tr>
-      <td style="padding:5px 10px;font-size:12px;font-weight:500">${b.bu}</td>
-      ${actCells}
-      <td style="padding:5px 8px;font-size:11px;text-align:right">${b.deals}</td>
-      <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);text-align:right">${b.cr.toFixed(1)}%</td>
-      <td style="padding:5px 8px;font-size:12px;font-weight:600;color:${meta.color};text-align:right">${fmtRev(b.rev)}<div style="margin-top:2px;width:100%;background:#f0f0f0;border-radius:2px;height:4px"><div style="width:${revW.toFixed(1)}%;background:${meta.color};height:4px;border-radius:2px"></div></div></td>
-      <td style="padding:5px 8px;font-size:11px;font-weight:700;color:${buRevColor};text-align:right">${buRevPct !== null ? buRevPct.toFixed(0)+'%' : '—'}</td>
-    </tr>`;
-  }).join('');
+    const buKpiPro = buKpiRaw > 0 ? buKpiRaw * daysInRange / daysInMonth : 0;
+    const buKpiPct = buKpiPro > 0 ? (rev / buKpiPro * 100) : null;
+    return { bu, days, ...buFields, rev, deals, cr, buKpiRaw, buKpiPro, buKpiPct };
+  });
 
-  const actColHeaders = sourceFields.filter(f=>['call','trial_book','activity'].includes(f.role)).slice(0,3)
-    .map(f => `<th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">${f.label}/d</th>`).join('');
+  // Sortable table state
+  const _srcDetailSortId = '__anaSD_' + source;
+  if (!window[_srcDetailSortId]) window[_srcDetailSortId] = { col: 'rev', dir: 'desc' };
+  const sortSt = window[_srcDetailSortId];
+
+  function sortBUData(arr, col, dir) {
+    return [...arr].sort((a,b) => {
+      let va = a[col], vb = b[col];
+      if (col === 'bu') { va = va || ''; vb = vb || ''; return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va); }
+      va = typeof va === 'number' ? va : 0; vb = typeof vb === 'number' ? vb : 0;
+      return dir === 'asc' ? va - vb : vb - va;
+    });
+  }
+
+  const sortedBU = sortBUData(buData, sortSt.col, sortSt.dir);
+  const maxRev = Math.max(...buData.map(b=>b.rev), 1);
+
+  function buildBURows(list) {
+    return list.map(b => {
+      const actCells = actCols.map(f => {
+        const bench = getBenchmark(f.id);
+        const dayVal = (b[f.id] || 0) / b.days;
+        const pct = bench > 0 ? (dayVal / bench * 100) : null;
+        const color = pct !== null ? pctColor(pct) : 'inherit';
+        return `<td style="padding:5px 8px;font-size:11px;color:${color};text-align:right">${dayVal.toFixed(1)}</td>`;
+      }).join('');
+      const revW = maxRev > 0 ? Math.min(b.rev / maxRev * 100, 100) : 0;
+      const buRevColor = b.buKpiPct !== null ? pctColor(b.buKpiPct) : 'inherit';
+      return `<tr>
+        <td style="padding:5px 10px;font-size:12px;font-weight:500">${b.bu}</td>
+        ${actCells}
+        <td style="padding:5px 8px;font-size:11px;text-align:right">${b.deals}</td>
+        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);text-align:right">${b.cr.toFixed(1)}%</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:600;color:${meta.color};text-align:right">
+          ${fmtRev(b.rev)}
+          <div style="margin-top:2px;width:100%;background:#f0f0f0;border-radius:2px;height:4px"><div style="width:${revW.toFixed(1)}%;background:${meta.color};height:4px;border-radius:2px"></div></div>
+        </td>
+        <td style="padding:5px 8px;font-size:11px;text-align:right">${b.buKpiRaw > 0 ? fmtRev(b.buKpiRaw) : '—'}</td>
+        <td style="padding:5px 8px;font-size:11px;font-weight:700;color:${buRevColor};text-align:right">${b.buKpiPct !== null ? b.buKpiPct.toFixed(0)+'%' : '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const buRows = buildBURows(sortedBU);
+
+  // Sort header helper
+  function srtHdr(label, colKey, align) {
+    const arrow = sortSt.col === colKey ? (sortSt.dir === 'asc' ? ' ↑' : ' ↓') : '';
+    const active = sortSt.col === colKey ? 'font-weight:700;color:var(--gray-800);' : '';
+    return `<th data-sort-col="${colKey}" style="padding:6px 8px;font-size:10px;font-weight:600;text-align:${align};cursor:pointer;user-select:none;${active}white-space:nowrap">${label}${arrow}</th>`;
+  }
+  const actColHeaders = actCols.map(f => srtHdr(f.label+'/d', f.id, 'right')).join('');
 
   // Build final HTML
   detailEl.innerHTML = `
@@ -8023,23 +8077,42 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
         </div>
       </div>
 
-      <!-- BU COMPARISON TABLE -->
-      <div style="margin-top:16px;font-size:12px;font-weight:600;color:var(--gray-700);border-bottom:1px solid var(--gray-200);padding-bottom:4px">So sánh BU (sắp xếp theo Doanh số)</div>
+      <!-- BU COMPARISON TABLE (sortable) -->
+      <div style="margin-top:16px;font-size:12px;font-weight:600;color:var(--gray-700);border-bottom:1px solid var(--gray-200);padding-bottom:4px">So sánh BU <span style="font-size:10px;font-weight:400;color:var(--gray-400)">(click tiêu đề cột để sắp xếp)</span></div>
       <div style="overflow-x:auto;margin-top:8px">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <table id="ana-sd-table-${source}" style="width:100%;border-collapse:collapse;font-size:12px">
           <thead><tr style="background:var(--gray-50)">
-            <th style="padding:6px 10px;font-size:10px;font-weight:600;text-align:left">BU</th>
+            ${srtHdr('BU', 'bu', 'left')}
             ${actColHeaders}
-            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">Deals</th>
-            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">CR%</th>
-            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">Doanh số</th>
-            <th style="padding:6px 8px;font-size:10px;font-weight:600;text-align:right">% KPI</th>
+            ${srtHdr('Deals', 'deals', 'right')}
+            ${srtHdr('CR%', 'cr', 'right')}
+            ${srtHdr('Doanh số', 'rev', 'right')}
+            ${srtHdr('KPI', 'buKpiRaw', 'right')}
+            ${srtHdr('% KPI', 'buKpiPct', 'right')}
           </tr></thead>
-          <tbody>${buRows || '<tr><td colspan="8" style="padding:12px;color:var(--gray-400);text-align:center">Không có dữ liệu</td></tr>'}</tbody>
+          <tbody>${buRows || '<tr><td colspan="10" style="padding:12px;color:var(--gray-400);text-align:center">Không có dữ liệu</td></tr>'}</tbody>
         </table>
       </div>
-      <div style="font-size:10px;color:var(--gray-400);margin-top:6px">Giá trị hoạt động tnh theo trung bình ngày/BU. Màu xanh ≥ 100%, cam ≥ 80%, đỏ < 80% benchmark.</div>
+      <div style="font-size:10px;color:var(--gray-400);margin-top:6px">Giá trị hoạt động tính theo trung bình ngày/BU. Màu xanh ≥ 100%, cam ≥ 80%, đỏ &lt; 80% benchmark.</div>
     </div>`;
+
+  // Attach sort click handlers
+  const tbl = document.getElementById('ana-sd-table-' + source);
+  if (tbl) {
+    tbl.querySelectorAll('th[data-sort-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.getAttribute('data-sort-col');
+        if (sortSt.col === col) {
+          sortSt.dir = sortSt.dir === 'desc' ? 'asc' : 'desc';
+        } else {
+          sortSt.col = col;
+          sortSt.dir = col === 'bu' ? 'asc' : 'desc';
+        }
+        // Re-render entire source detail
+        renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth, daysInRange, buCount);
+      });
+    });
+  }
 }
 
 // MiMi AI deep analysis from FM Analytics tab
