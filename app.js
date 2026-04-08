@@ -5268,13 +5268,18 @@ const _configCache = {};
 
 /** Preload config for a month (called before scoring) */
 async function preloadConfigForMonth(month) {
-  if (_configCache[month]) return _configCache[month];
+  if (_configCache[month]) {
+    // Đã cache → chỉ cần set state.config.data
+    state.config.data = _configCache[month];
+    return _configCache[month];
+  }
   try {
     const url = `${APPS_SCRIPT_URL}?action=get_config&month=${encodeURIComponent(month)}`;
     const res = await fetch(url);
     const json = await res.json();
     if (json.config && Object.keys(json.config).length > 0) {
       _configCache[month] = json.config;
+      state.config.data = json.config; // Sync vào state để getBenchmark/getCRBenchmark đọc được
     } else {
       _configCache[month] = null;
     }
