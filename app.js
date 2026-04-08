@@ -8028,7 +8028,6 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
         <td style="padding:5px 10px;font-size:12px;font-weight:500">${b.bu}</td>
         ${actCells}
         <td style="padding:5px 8px;font-size:11px;text-align:right">${b.deals}</td>
-        <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);text-align:right">${b.cr.toFixed(1)}%</td>
         <td style="padding:5px 8px;font-size:12px;font-weight:600;color:${meta.color};text-align:right">
           ${fmtRev(b.rev)}
           <div style="margin-top:2px;width:100%;background:#f0f0f0;border-radius:2px;height:4px"><div style="width:${revW.toFixed(1)}%;background:${meta.color};height:4px;border-radius:2px"></div></div>
@@ -8099,7 +8098,6 @@ function renderAnalyticsSourceDetail(data, source, uniqueBUs, month, daysInMonth
             ${srtHdr('BU', 'bu', 'left')}
             ${actColHeaders}
             ${srtHdr('Deals', 'deals', 'right')}
-            ${srtHdr('CR%', 'cr', 'right')}
             ${srtHdr('Doanh số', 'rev', 'right')}
             ${srtHdr('% KPI', 'buKpiPct', 'right')}
           </tr></thead>
